@@ -64,6 +64,31 @@
     <section id="m3u8" class="hide">
       <h1 class="optionsTitle" data-i18n="titleM3U8"></h1>
       <span class="explain" id="key"></span>
+
+      <!-- 队列管理设置 -->
+      <div class="queue-settings">
+        <h3>队列管理设置</h3>
+        <div class="queue-settings-row">
+          <label class="queue-checkbox">
+            <input type="checkbox" id="enableQueueManagement" save="change" />
+            启用队列管理
+          </label>
+          <label class="queue-checkbox">
+            最大并发数:
+            <input type="number" id="maxConcurrentDownloads" class="queue-number-input"
+                   value="2" min="1" max="10" save="change" />
+          </label>
+          <label class="queue-checkbox">
+            <input type="checkbox" id="enableStreamSaver" save="change" checked />
+            边下边存
+          </label>
+        </div>
+        <div class="queue-settings-row">
+          <button id="addToQueueBtn" class="btn btn-info" style="display: none;">添加到队列</button>
+          <button id="showQueueManager" class="btn btn-secondary">显示队列管理器</button>
+        </div>
+      </div>
+
       <div class="optionBox">
         <div class="block">
           <p data-i18n-outer="m3u8Url"></p>
@@ -188,6 +213,7 @@
   <script src="lib/base64.js"></script>
   <script src="lib/StreamSaver.js"></script>
   <script src="js/m3u8.downloader.js"></script>
+  <script src="js/m3u8.queue.manager.js"></script>
   <script src="js/m3u8.js"></script>
   <script src="js/i18n.js"></script>
 </body>

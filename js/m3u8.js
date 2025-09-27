@@ -1952,3 +1952,287 @@ chrome.runtime.onMessage.addListener(function (Message, sender, sendResponse) {
         $("#autoClose").prop("checked") && closeTab();
     }, Math.ceil(Math.random() * 500));
 });
+/* ===== 队列管理集成代码 ===== */
+
+// 初始化队列管理器
+$(document).ready(function() {
+    // 初始化队列管理器
+    initQueueManager();
+
+    // 绑定队列管理设置事件
+    bindQueueManagementEvents();
+
+    // 从设置中恢复队列管理状态
+    restoreQueueSettings();
+});
+
+/**
+ * 绑定队列管理相关事件
+ */
+function bindQueueManagementEvents() {
+    // 启用/禁用队列管理
+    $("#enableQueueManagement").change(function() {
+        const enabled = $(this).prop("checked");
+        const queueManager = getQueueManager();
+        queueManager.setEnabled(enabled);
+
+        // 显示/隐藏相关按钮
+        if (enabled) {
+            $("#addToQueueBtn").show();
+            $("#mergeTs").text("合并下载(队列)");
+        } else {
+            $("#addToQueueBtn").hide();
+            $("#mergeTs").text("合并下载");
+        }
+
+        // 保存设置
+        saveQueueSettings();
+    });
+
+    // 最大并发数变化
+    $("#maxConcurrentDownloads").change(function() {
+        const max = parseInt($(this).val()) || 2;
+        const queueManager = getQueueManager();
+        queueManager.setMaxConcurrentDownloads(max);
+        saveQueueSettings();
+    });
+
+    // 边下边存设置
+    $("#enableStreamSaver").change(function() {
+        const enabled = $(this).prop("checked");
+        $("#StreamSaver").prop("checked", enabled);
+        saveQueueSettings();
+    });
+
+    // 添加到队列按钮
+    $("#addToQueueBtn").click(function() {
+        addCurrentTaskToQueue();
+    });
+
+    // 显示队列管理器
+    $("#showQueueManager").click(function() {
+        const queueManager = getQueueManager();
+        if (queueManager.isEnabled) {
+            $("#queueManager").toggle();
+        } else {
+            alert("请先启用队列管理功能！");
+        }
+    });
+}
+
+/**
+ * 保存队列设置
+ */
+function saveQueueSettings() {
+    const settings = {
+        enabled: $("#enableQueueManagement").prop("checked"),
+        maxConcurrent: parseInt($("#maxConcurrentDownloads").val()) || 2,
+        streamSaver: $("#enableStreamSaver").prop("checked")
+    };
+    localStorage.setItem('m3u8_queue_settings', JSON.stringify(settings));
+}
+
+/**
+ * 恢复队列设置
+ */
+function restoreQueueSettings() {
+    try {
+        const settings = JSON.parse(localStorage.getItem('m3u8_queue_settings') || '{}');
+
+        $("#enableQueueManagement").prop("checked", settings.enabled || false);
+        $("#maxConcurrentDownloads").val(settings.maxConcurrent || 2);
+        $("#enableStreamSaver").prop("checked", settings.streamSaver !== undefined ? settings.streamSaver : true); // 默认开启边下边存
+
+        // 触发变化事件
+        $("#enableQueueManagement").trigger("change");
+        $("#maxConcurrentDownloads").trigger("change");
+        $("#enableStreamSaver").trigger("change");
+    } catch (error) {
+        console.warn("Failed to restore queue settings:", error);
+    }
+}
+
+/**
+ * 添加当前任务到队列
+ */
+function addCurrentTaskToQueue() {
+    if (!_fragments || _fragments.length === 0) {
+        alert("请先解析M3U8文件！");
+        return;
+    }
+
+    // 获取当前设置
+    const taskConfig = getCurrentTaskConfig();
+
+    // 添加到队列
+    const queueManager = getQueueManager();
+    const task = queueManager.addTask(taskConfig);
+
+    if (task) {
+        alert(`任务"${task.title}"已添加到下载队列！`);
+    }
+}
+
+/**
+ * 获取当前任务配置
+ */
+function getCurrentTaskConfig() {
+    // 计算下载范围
+    let start = $("#rangeStart").val();
+    if (start.includes(":")) {
+        start = timeToIndex(start);
+    } else {
+        start = parseInt(start);
+        start = start ? start - 1 : 0;
+    }
+
+    let end = $("#rangeEnd").val();
+    if (end.includes(":")) {
+        end = timeToIndex(end);
+    } else {
+        end = parseInt(end);
+        end = end ? end : _fragments.length;
+    }
+
+    // 验证范围
+    if (start < 0) start = 0;
+    if (end > _fragments.length) end = _fragments.length;
+    if (start >= end) end = start + 1;
+
+    // 获取文件名
+    let title = "";
+    const customFilename = $('#customFilename').val().trim();
+    if (customFilename) {
+        title = customFilename;
+    } else if (_fileName) {
+        title = _fileName;
+    } else {
+        title = _title ? stringModify(_title) : GetFileName(_m3u8Url);
+    }
+
+    return {
+        title: title,
+        url: _m3u8Url,
+        fragments: _fragments.slice(start, end),
+        thread: parseInt($("#thread").val()) || 6,
+        customKey: $("#customKey").val().trim(),
+        customIV: $("#customIV").val().trim(),
+        customFilename: customFilename,
+        mp4: $("#mp4").prop("checked"),
+        onlyAudio: $("#onlyAudio").prop("checked"),
+        skipDecrypt: $("#skipDecrypt").prop("checked"),
+        streamSaver: $("#enableStreamSaver").prop("checked"),
+        rangeStart: start,
+        rangeEnd: end
+    };
+}
+
+/**
+ * 修改原有的下载函数，支持队列管理
+ */
+const originalMergeClick = $("#mergeTs").get(0) ? $("#mergeTs").get(0).onclick : null;
+
+// 重新绑定下载按钮事件
+$("#mergeTs").off("click").click(async function () {
+    // 检查是否启用队列管理
+    if ($("#enableQueueManagement").prop("checked")) {
+        // 如果启用队列管理，添加到队列而不是直接下载
+        addCurrentTaskToQueue();
+        return;
+    }
+
+    // 否则执行原有的下载逻辑
+    initDownload(); // 初始化下载变量
+    // 设定起始序号
+    let start = $("#rangeStart").val();
+    if (start.includes(":")) {
+        start = timeToIndex(start);
+    } else {
+        start = parseInt(start);
+        start = start ? start - 1 : 0;
+    }
+    // 设定结束序号
+    let end = $("#rangeEnd").val();
+    if (end.includes(":")) {
+        end = timeToIndex(end);
+    } else {
+        end = parseInt(end);
+        end = end ? end - 1 : _fragments.length - 1;
+    }
+    // 检查序号
+    if (start == -1 || end == -1) {
+        $progress.html(`<b>${i18n.sNumError}</b>`);
+        return;
+    }
+    if (start > end) {
+        $progress.html(`<b>${i18n.startGTend}</b>`);
+        return;
+    }
+    if (start > _fragments.length - 1 || end > _fragments.length - 1) {
+        $progress.html(`<b>${i18n("sNumMax", _fragments.length)}</b>`);
+        return;
+    }
+    /* 设定自定义密钥和IV */
+    let customKey = $("#customKey").val().trim();
+    if (customKey) {
+        if (isHexKey(customKey)) {
+            customKey = HexStringToArrayBuffer(customKey);
+        } else if (customKey.length == 24 && customKey.slice(-2) == "==") {
+            customKey = Base64ToArrayBuffer(customKey);
+            // console.log(customKey);
+        } else if (/^http[s]*:\/\/.+/i.test(customKey)) {
+            let flag = false;
+            await $.ajax({
+                url: customKey,
+                xhrFields: { responseType: "arraybuffer" }
+            }).fail(function () {
+                flag = true;
+            }).done(function (responseData) {
+                customKey = responseData;
+                $("#customKey").val(ArrayBufferToBase64(customKey));
+                $m3u8dlArg.val(getM3u8DlArg());
+            });
+            if (flag) {
+                $progress.html(`<b>${i18n.keyLoadFailed}</b>`);
+                return;
+            }
+        } else {
+            $progress.html(`<b>${i18n.keyFormatError}</b>`);
+            return;
+        }
+    }
+    let customIV = $("#customIV").val().trim();
+    if (customIV && customIV.length != 32) {
+        $progress.html(`<b>${i18n.ivFormatError}</b>`);
+        return;
+    }
+    downloadNew(start, end + 1, customKey, customIV);
+});
+
+// 监听页面刷新事件，检查是否需要重新点击下载
+$(window).on('beforeunload', function() {
+    const queueManager = getQueueManager();
+    if (queueManager && queueManager.isEnabled) {
+        // 检查当前是否有任务在队列中等待
+        const status = queueManager.getStatus();
+        if (status.queueLength > 0 && status.activeDownloads < status.maxConcurrentDownloads) {
+            // 设置标记，页面重新加载后自动处理队列
+            sessionStorage.setItem('m3u8_auto_process_queue', 'true');
+        }
+    }
+});
+
+// 页面加载完成后检查是否需要自动处理队列
+$(window).on('load', function() {
+    if (sessionStorage.getItem('m3u8_auto_process_queue') === 'true') {
+        sessionStorage.removeItem('m3u8_auto_process_queue');
+
+        // 延迟处理，确保页面完全加载
+        setTimeout(() => {
+            const queueManager = getQueueManager();
+            if (queueManager && queueManager.isEnabled) {
+                queueManager.processQueue();
+            }
+        }, 1000);
+    }
+});

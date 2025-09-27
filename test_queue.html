@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>M3U8 队列管理测试</title>
+    <link rel="stylesheet" type="text/css" href="css/public.css" />
+    <script src="lib/jquery.min.js"></script>
+</head>
+<body>
+    <div class="m3u8_wrapper wrapper1080">
+        <h1>M3U8 队列管理系统测试</h1>
+
+        <!-- 模拟队列设置 -->
+        <div class="queue-settings">
+            <h3>队列管理设置</h3>
+            <div class="queue-settings-row">
+                <label class="queue-checkbox">
+                    <input type="checkbox" id="enableQueueManagement" />
+                    启用队列管理
+                </label>
+                <label class="queue-checkbox">
+                    最大并发数:
+                    <input type="number" id="maxConcurrentDownloads" class="queue-number-input"
+                           value="2" min="1" max="10" />
+                </label>
+                <label class="queue-checkbox">
+                    <input type="checkbox" id="enableStreamSaver" checked />
+                    边下边存
+                </label>
+            </div>
+            <div class="queue-settings-row">
+                <button id="addTestTask" class="btn btn-info">添加测试任务</button>
+                <button id="showQueueManager" class="btn btn-secondary">显示队列管理器</button>
+            </div>
+        </div>
+
+        <div class="optionBox">
+            <div class="block">
+                <h3>测试控制</h3>
+                <button id="testAddMultiple" class="btn btn-warning">添加多个任务</button>
+                <button id="testClearAll" class="btn btn-danger">清空所有任务</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模拟必要的全局变量和函数 -->
+    <script>
+        // 模拟全局变量
+        let _fragments = [];
+        let _m3u8Url = "https://example.com/test.m3u8";
+        let _title = "测试视频";
+        let _fileName = "test_video";
+
+        // 创建模拟片段
+        for (let i = 0; i < 100; i++) {
+            _fragments.push({
+                index: i,
+                url: `https://example.com/segment${i}.ts`,
+                duration: 10,
+                sn: i
+            });
+        }
+
+        // 模拟必要的DOM元素
+        $('body').append(`
+            <div id="progress" style="display:none;"></div>
+            <div id="fileSize" style="display:none;"></div>
+            <div id="fileDuration" style="display:none;"></div>
+        `);
+
+        // 模拟必要的函数
+        window.mergeTsNew = function(downloader) {
+            console.log('模拟合并文件:', downloader);
+        };
+
+        window.stringModify = function(str) {
+            return str.replace(/[^\w\s-]/g, '').trim();
+        };
+
+        window.GetFileName = function(url) {
+            return url.split('/').pop().split('?')[0];
+        };
+
+        window.isHexKey = function(key) {
+            return /^[0-9a-fA-F]+$/.test(key) && key.length === 32;
+        };
+
+        window.HexStringToArrayBuffer = function(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+            }
+            return bytes.buffer;
+        };
+
+        window.Base64ToArrayBuffer = function(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        // 模拟Downloader类
+        window.Downloader = class {
+            constructor(fragments, thread) {
+                this.fragments = fragments;
+                this.thread = thread;
+                this.events = {};
+                this.buffer = [];
+                this.state = 'waiting';
+                this.success = 0;
+                this.total = fragments.length;
+                this.buffersize = 0;
+                this.duration = 0;
+            }
+
+            on(event, callback) {
+                if (!this.events[event]) this.events[event] = [];
+                this.events[event].push(callback);
+            }
+
+            emit(event, ...args) {
+                if (this.events[event]) {
+                    this.events[event].forEach(cb => cb(...args));
+                }
+            }
+
+            start() {
+                console.log('开始下载任务，片段数:', this.fragments.length);
+                this.state = 'running';
+
+                // 模拟下载过程
+                let completed = 0;
+                const interval = setInterval(() => {
+                    if (completed < this.fragments.length) {
+                        const fragment = this.fragments[completed];
+
+                        // 模拟下载完成
+                        this.emit('completed', new ArrayBuffer(1024), fragment);
+                        this.buffer.push(new ArrayBuffer(1024));
+                        this.success++;
+                        this.buffersize += 1024;
+                        this.duration += fragment.duration || 10;
+                        completed++;
+
+                        // 模拟进度
+                        this.emit('itemProgress', fragment, true, 1024, 1024);
+                    } else {
+                        clearInterval(interval);
+                        this.emit('allCompleted', this.buffer);
+                        console.log('任务下载完成');
+                    }
+                }, 100); // 每100ms完成一个片段
+            }
+
+            stop() {
+                this.state = 'abort';
+                console.log('停止下载');
+            }
+
+            setDecrypt(fn) {
+                this.decrypt = fn;
+            }
+        };
+    </script>
+
+    <script src="js/m3u8.queue.manager.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            // 初始化队列管理器
+            const queueManager = initQueueManager();
+
+            // 绑定测试事件
+            $("#enableQueueManagement").change(function() {
+                const enabled = $(this).prop("checked");
+                queueManager.setEnabled(enabled);
+            });
+
+            $("#maxConcurrentDownloads").change(function() {
+                const max = parseInt($(this).val()) || 2;
+                queueManager.setMaxConcurrentDownloads(max);
+            });
+
+            $("#showQueueManager").click(function() {
+                $("#queueManager").toggle();
+            });
+
+            $("#addTestTask").click(function() {
+                const taskConfig = {
+                    title: `测试任务 ${Date.now()}`,
+                    url: _m3u8Url,
+                    fragments: _fragments.slice(0, 20), // 只取前20个片段进行测试
+                    thread: 6,
+                    customKey: "",
+                    customIV: "",
+                    customFilename: "",
+                    mp4: false,
+                    onlyAudio: false,
+                    skipDecrypt: false,
+                    streamSaver: false,
+                    rangeStart: 0,
+                    rangeEnd: 20
+                };
+
+                const task = queueManager.addTask(taskConfig);
+                if (task) {
+                    console.log('添加测试任务成功:', task.title);
+                }
+            });
+
+            $("#testAddMultiple").click(function() {
+                // 启用队列管理
+                $("#enableQueueManagement").prop("checked", true).trigger("change");
+
+                // 添加5个测试任务
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        $("#addTestTask").click();
+                    }, i * 200);
+                }
+            });
+
+            $("#testClearAll").click(function() {
+                if (confirm('确定要清空所有任务吗？')) {
+                    // 清空localStorage
+                    localStorage.removeItem('m3u8_queue_tasks');
+                    for (let i = 0; i < 100; i++) {
+                        localStorage.removeItem(`m3u8_resume_${i}`);
+                    }
+
+                    // 重新初始化
+                    location.reload();
+                }
+            });
+
+            // 默认启用队列管理进行测试
+            $("#enableQueueManagement").prop("checked", true).trigger("change");
+        });
+    </script>
+</body>
+</html>
