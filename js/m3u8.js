@@ -139,6 +139,11 @@ function init() {
     // 发送到ffmpeg取消边下边存设置
     _ffmpeg && $("#StreamSaver").prop("checked", false);
 
+    // 自动设置自定义文件名为网页标题
+    if (_title && _title !== "NULL") {
+        $("#customFilename").val(stringModify(_title));
+    }
+
     // 存在密钥参数 自动填写密钥
     key && $("#customKey").val(key);
 
@@ -1503,7 +1508,8 @@ function mergeTsNew(down) {
     } else if (_fileName) {
         fileName = _fileName;
     } else {
-        fileName = GetFileName(_m3u8Url);
+        // 使用页面标题作为文件名，与文件夹名保持一致
+        fileName = _title ? stringModify(_title) : GetFileName(_m3u8Url);
     }
     // 删除目录
     // fileName = fileName.split("/");
@@ -1550,7 +1556,7 @@ function mergeTsNew(down) {
             title: fileName,
             output: fileName,
             name: "memory" + new Date().getTime() + "." + ext,
-            active: G.isMobile || !autoDown,
+            active: false, // 不跳转到FFmpeg页面
             tabId: currentTabId,
         };
         if (_quantity) {

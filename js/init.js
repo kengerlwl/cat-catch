@@ -155,7 +155,7 @@ G.OptionLists = {
     invokeConfirm: false,
     // m3u8解析器默认参数
     M3u8Thread: 6,
-    M3u8Mp4: false,
+    M3u8Mp4: true,  // 默认启用MP4转换
     M3u8OnlyAudio: false,
     M3u8SkipDecrypt: false,
     M3u8StreamSaver: false,
