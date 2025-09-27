@@ -39,9 +39,9 @@ if __name__ == '__main__':
     browser_thread.start()
 
     try:
-        app.run(debug=False, host='0.0.0.0', port=5000)
+        app.run(debug=False, host='0.0.0.0', port=5001)
     except KeyboardInterrupt:
         print("\n👋 感谢使用 Flask M3U8 下载管理器！")
     except Exception as e:
         print(f"❌ 启动失败: {e}")
-        print("请检查端口5000是否被占用")
+        print("请检查端口5001是否被占用")

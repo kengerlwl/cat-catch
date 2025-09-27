@@ -62,7 +62,7 @@ if exist "dist\Flask-M3U8-Manager.exe" (
     dir "dist\Flask-M3U8-Manager.exe" | findstr "Flask-M3U8-Manager.exe"
     echo.
     echo You can now run the executable to start the Flask M3U8 Manager.
-    echo The application will be available at http://localhost:5000
+    echo The application will be available at http://localhost:5001
     echo.
 
     :: 询问是否要运行

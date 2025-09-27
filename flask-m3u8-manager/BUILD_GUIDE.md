@@ -74,7 +74,7 @@ cd flask-m3u8-manager
 
 2. **访问管理界面**：
    - 程序启动后会自动打开浏览器
-   - 手动访问：http://localhost:5000
+   - 手动访问：http://localhost:5001
 
 3. **开始使用**：
    - 添加M3U8下载任务

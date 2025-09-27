@@ -64,7 +64,7 @@ jobs:
         "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
         "Usage:" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
         "1. Double-click Flask-M3U8-Manager.exe to start the application" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
-        "2. The application will start on http://localhost:5000" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "2. The application will start on http://localhost:5001" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
         "3. Your browser should automatically open to the management interface" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
         "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
         "Features:" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
@@ -100,7 +100,7 @@ jobs:
           ### 📦 使用方法
           1. 下载 `Flask-M3U8-Manager.exe`
           2. 双击运行程序
-          3. 浏览器会自动打开管理界面 (http://localhost:5000)
+          3. 浏览器会自动打开管理界面 (http://localhost:5001)
           4. 开始添加和管理下载任务
 
           ### 🔧 系统要求

@@ -65,7 +65,7 @@ if [ -f "dist/Flask-M3U8-Manager" ]; then
     echo "File size: $(ls -lh dist/Flask-M3U8-Manager | awk '{print $5}')"
     echo ""
     echo "You can now run the executable to start the Flask M3U8 Manager."
-    echo "The application will be available at http://localhost:5000"
+    echo "The application will be available at http://localhost:5001"
     echo ""
 
     # 询问是否要运行
