@@ -58,26 +58,22 @@ jobs:
         Copy-Item "README.md" "release\"
         Copy-Item "requirements.txt" "release\"
 
-        $readmeContent = @"
-Flask M3U8 Manager - Portable Version
-
-This is a portable executable version of Flask M3U8 Manager.
-
-Usage:
-1. Double-click Flask-M3U8-Manager.exe to start the application
-2. The application will start on http://localhost:5000
-3. Your browser should automatically open to the management interface
-
-Features:
-- M3U8 video download management
-- Task queue and progress monitoring
-- MP4 conversion support
-- Integration with cat-catch browser extension
-
-Note: The downloads folder will be created in the same directory as the executable.
-"@
-
-        $readmeContent | Out-File -FilePath "release\README_EXE.txt" -Encoding UTF8
+        "Flask M3U8 Manager - Portable Version" | Out-File -FilePath "release\README_EXE.txt" -Encoding UTF8
+        "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "This is a portable executable version of Flask M3U8 Manager." | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "Usage:" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "1. Double-click Flask-M3U8-Manager.exe to start the application" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "2. The application will start on http://localhost:5000" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "3. Your browser should automatically open to the management interface" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "Features:" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "- M3U8 video download management" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "- Task queue and progress monitoring" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "- MP4 conversion support" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "- Integration with cat-catch browser extension" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "" | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
+        "Note: The downloads folder will be created in the same directory as the executable." | Out-File -FilePath "release\README_EXE.txt" -Append -Encoding UTF8
 
     - name: Upload EXE artifact
       uses: actions/upload-artifact@v4
