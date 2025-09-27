@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Cat Catch - M3U8 工具集</title>
+  <link rel="stylesheet" type="text/css" href="css/public.css" media="all" />
+  <link rel="stylesheet" type="text/css" href="css/options.css" media="all" />
+  <style>
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .nav-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .nav-header h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+    }
+
+    .nav-header p {
+      color: #666;
+      font-size: 1.2em;
+    }
+
+    .nav-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .nav-card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+
+    .nav-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border-color: #007bff;
+    }
+
+    .nav-card-icon {
+      font-size: 3em;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .nav-card h3 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 1.5em;
+      text-align: center;
+    }
+
+    .nav-card p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .nav-card-features {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0;
+    }
+
+    .nav-card-features li {
+      padding: 5px 0;
+      color: #555;
+      position: relative;
+      padding-left: 20px;
+    }
+
+    .nav-card-features li:before {
+      content: "✓";
+      color: #28a745;
+      font-weight: bold;
+      position: absolute;
+      left: 0;
+    }
+
+    .nav-button {
+      display: block;
+      width: 100%;
+      padding: 15px 20px;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.1em;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+    }
+
+    .nav-button:hover {
+      background: linear-gradient(135deg, #0056b3, #004085);
+      transform: translateY(-2px);
+    }
+
+    .nav-button.download {
+      background: linear-gradient(135deg, #2196f3, #1976d2);
+    }
+
+    .nav-button.convert {
+      background: linear-gradient(135deg, #4caf50, #388e3c);
+    }
+
+    .nav-button.original {
+      background: linear-gradient(135deg, #ff9800, #f57c00);
+    }
+
+    .feature-comparison {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 30px;
+      margin-top: 40px;
+    }
+
+    .feature-comparison h3 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    .comparison-table th {
+      background: #007bff;
+      color: white;
+      font-weight: bold;
+    }
+
+    .comparison-table tr:hover {
+      background: #f8f9fa;
+    }
+
+    .status-yes {
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .status-no {
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      .nav-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-header h1 {
+        font-size: 2em;
+      }
+
+      .comparison-table {
+        font-size: 14px;
+      }
+
+      .comparison-table th,
+      .comparison-table td {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="nav-container">
+    <div class="nav-header">
+      <h1>🐱 Cat Catch - M3U8 工具集</h1>
+      <p>强大的M3U8视频下载和转换工具，支持多种工作流程</p>
+    </div>
+
+    <div class="nav-grid">
+      <!-- M3U8下载器 -->
+      <div class="nav-card">
+        <div class="nav-card-icon">📥</div>
+        <h3>M3U8 下载器</h3>
+        <p>专门用于下载M3U8视频文件，不进行格式转换，保持原始TS格式。</p>
+        <ul class="nav-card-features">
+          <li>仅下载，不转换</li>
+          <li>保持原始TS格式</li>
+          <li>支持加密视频解密</li>
+          <li>多线程下载</li>
+          <li>断点续传支持</li>
+        </ul>
+        <a href="m3u8-download.html" class="nav-button download">开始下载</a>
+      </div>
+
+      <!-- MP4转换器 -->
+      <div class="nav-card">
+        <div class="nav-card-icon">🔄</div>
+        <h3>MP4 转换器</h3>
+        <p>将本地的M3U8或TS文件批量转换为MP4格式，支持队列管理。</p>
+        <ul class="nav-card-features">
+          <li>批量转换</li>
+          <li>队列管理</li>
+          <li>并发控制</li>
+          <li>支持音频提取</li>
+          <li>拖拽文件支持</li>
+        </ul>
+        <a href="mp4-converter.html" class="nav-button convert">开始转换</a>
+      </div>
+
+      <!-- 原版M3U8工具 -->
+      <div class="nav-card">
+        <div class="nav-card-icon">🛠️</div>
+        <h3>原版 M3U8 工具</h3>
+        <p>集成下载和转换功能的原版工具，一站式解决方案。</p>
+        <ul class="nav-card-features">
+          <li>下载+转换一体化</li>
+          <li>实时转码</li>
+          <li>FFmpeg集成</li>
+          <li>队列管理</li>
+          <li>完整功能集</li>
+        </ul>
+        <a href="m3u8.html" class="nav-button original">使用原版</a>
+      </div>
+    </div>
+
+    <!-- 功能对比 -->
+    <div class="feature-comparison">
+      <h3>📊 功能对比</h3>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>功能特性</th>
+            <th>M3U8下载器</th>
+            <th>MP4转换器</th>
+            <th>原版工具</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>下载M3U8视频</td>
+            <td class="status-yes">✓ 专业</td>
+            <td class="status-no">✗</td>
+            <td class="status-yes">✓ 支持</td>
+          </tr>
+          <tr>
+            <td>格式转换</td>
+            <td class="status-no">✗</td>
+            <td class="status-yes">✓ 专业</td>
+            <td class="status-yes">✓ 支持</td>
+          </tr>
+          <tr>
+            <td>批量处理</td>
+            <td class="status-no">✗</td>
+            <td class="status-yes">✓ 优秀</td>
+            <td class="status-yes">✓ 队列</td>
+          </tr>
+          <tr>
+            <td>本地文件处理</td>
+            <td class="status-no">✗</td>
+            <td class="status-yes">✓ 专业</td>
+            <td class="status-no">✗</td>
+          </tr>
+          <tr>
+            <td>实时转码</td>
+            <td class="status-no">✗</td>
+            <td class="status-no">✗</td>
+            <td class="status-yes">✓ 支持</td>
+          </tr>
+          <tr>
+            <td>界面简洁度</td>
+            <td class="status-yes">✓ 简洁</td>
+            <td class="status-yes">✓ 清晰</td>
+            <td>⚠️ 复杂</td>
+          </tr>
+          <tr>
+            <td>适用场景</td>
+            <td>快速下载</td>
+            <td>批量转换</td>
+            <td>全功能使用</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 使用建议 -->
+    <div class="feature-comparison">
+      <h3>💡 使用建议</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #2196f3;">
+          <h4 style="color: #2196f3; margin-top: 0;">🎯 想要快速下载</h4>
+          <p>使用 <strong>M3U8下载器</strong>，专注于下载功能，界面简洁，操作快速。</p>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #4caf50;">
+          <h4 style="color: #4caf50; margin-top: 0;">🔄 需要批量转换</h4>
+          <p>使用 <strong>MP4转换器</strong>，支持拖拽添加文件，批量转换，进度管理。</p>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ff9800;">
+          <h4 style="color: #ff9800; margin-top: 0;">🛠️ 需要完整功能</h4>
+          <p>使用 <strong>原版工具</strong>，功能最全面，支持各种高级设置和选项。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

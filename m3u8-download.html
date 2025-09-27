@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>M3U8 下载器</title>
+  <link rel="stylesheet" type="text/css" href="css/public.css" media="all" />
+  <link rel="stylesheet" type="text/css" href="css/options.css" media="all" />
+  <script src="lib/jquery.min.js"></script>
+  <script src="js/init.js"></script>
+  <script src="js/firefox.js"></script>
+  <script src="js/function.js"></script>
+</head>
+
+<body>
+  <div class="m3u8_wrapper wrapper1080">
+
+    <section id="loading">
+      <div class="optionBox" data-i18n="loading">加载中...</div>
+    </section>
+
+    <section id="m3u8Custom" class="hide">
+      <h1 class="optionsTitle">M3U8 下载器</h1>
+      <div class="optionBox">
+        <textarea id="m3u8Text" spellcheck="false" placeholder="请输入m3u8链接或内容" class="width100"></textarea>
+        <input type="text" id="baseUrl" placeholder="BaseURL" class="fullInput" />
+        <div class="line"></div>
+        <input type="text" id="referer" placeholder="Referer" class="fullInput" />
+        <button id="parse" type="button">解析</button>
+        <input id="uploadM3U8" type="file" />
+      </div>
+    </section>
+
+    <section id="more_m3u8" class="hide">
+      <h1 class="optionsTitle">选择视频质量</h1>
+      <span class="explain">请选择要下载的视频质量</span>
+      <div class="optionBox">
+        <div id="next_m3u8"></div>
+      </div>
+    </section>
+
+    <section id="more_audio" class="hide">
+      <h1 class="optionsTitle">选择音频</h1>
+      <span class="explain">请选择要下载的音频轨道</span>
+      <div class="optionBox">
+        <div id="next_audio"></div>
+      </div>
+    </section>
+
+    <section id="more_subtitle" class="hide">
+      <h1 class="optionsTitle">选择字幕</h1>
+      <span class="explain">请选择要下载的字幕</span>
+      <div class="optionBox">
+        <div id="next_subtitle"></div>
+      </div>
+    </section>
+
+    <section id="m3u8" class="hide">
+      <h1 class="optionsTitle">M3U8 下载器 - 仅下载模式</h1>
+      <span class="explain" id="key">此模式只下载m3u8视频文件，不会自动转换为MP4格式</span>
+
+      <!-- 切片存储信息 -->
+      <div class="block" style="background-color: #f0f8ff; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+        <h4 style="margin: 0 0 8px 0; color: #1976d2;">📁 切片存储信息</h4>
+        <p style="margin: 5px 0; font-size: 13px; color: #666;">
+          • <strong>存储位置</strong>: Downloads/m3u8/项目目录/<br>
+          • <strong>断点续传</strong>: 支持，重新下载时会跳过已存在的切片<br>
+          • <strong>文件管理</strong>: 切片文件会保存到本地，便于后续转换或备份
+        </p>
+        <div id="segmentDirInfo" style="font-size: 12px; color: #888; margin-top: 8px;">
+          当前项目目录: <span id="currentSegmentDir">未开始下载</span>
+        </div>
+      </div>
+
+      <div class="optionBox">
+        <div class="block">
+          <p>M3U8 链接:</p>
+          <p><a id="m3u8_url"></a></p>
+        </div>
+
+        <div class="block" id="tips"></div>
+        <div class="block hide" id="maybeKey">
+          <select class="m3u8Key select">
+            <option value="tips">可能的密钥</option>
+          </select>
+          <button id="searchingForRealKey">搜索真实密钥</button>
+        </div>
+
+        <div class="videoInfo flex">
+          <div id="count"></div>
+          <div id="info"></div>
+          <div id="estimateFileSize"></div>
+        </div>
+
+        <div class="block" id="textarea">
+          <details>
+            <summary class="button">查看切片列表</summary>
+            <textarea id="media_file" spellcheck="false" data-type="link" class="width100">加载中...</textarea>
+            <div id="downList">等待下载</div>
+            <div class="merge">
+              <button id="downText">下载切片列表</button>
+              <button id="originalM3U8">原始M3u8</button>
+              <button id="localFile" class="hide">本地M3u8</button>
+              <button id="downProgress">下载进度</button>
+              <button id="getTs">切片列表</button>
+            </div>
+          </details>
+        </div>
+
+        <video id="video" class="hide" controls></video>
+
+        <div class="block" id="button">
+          <div class="merge">
+            <button id="tsAddArg">获取参数</button>
+            <button id="setRequestHeaders">请求头</button>
+            <button id="play" data-switch="on">播放</button>
+            <button id="m3u8DL" class="button2">调用M3u8DL</button>
+            <button id="copyM3U8dl" class="hide">复制命令</button>
+            <button id="setM3u8dl">预览命令</button>
+            <label class="m3u8checkbox textColor">
+              <p>添加设置参数:</p><input type="checkbox" id="addParam" save="change" />
+            </label>
+            <button id="invoke" class="button2">调用</button>
+            <button class="openDir hide">下载目录</button>
+          </div>
+          <textarea id="m3u8dlArg" type="text" class="m3u8dlArg hide"></textarea>
+          <div class="line"></div>
+          <div class="merge customKey">
+            <input type="text" id="customFilename" spellcheck="false" placeholder="自定义保存文件名" size="30" />
+            <input type="text" id="customKey" spellcheck="false" placeholder="自定义密钥" size="60" />
+            <input type="text" id="customIV" spellcheck="false" placeholder="IV" size="30" />
+            <button id="uploadKey">上传密钥</button>
+            <input id="uploadKeyFile" type="file" class="hide" />
+          </div>
+          <div class="merge" id="mergeDown">
+            <div id="threadDiv" class="textColor">
+              <p>下载线程:</p> <input type="number" value="6" id="thread" spellcheck="false" style="width: 35px;" step="1" min="1" max="256" save="change" />
+            </div>
+            <label class="m3u8checkbox textColor firefoxHide">
+              <p>边下边存:</p><input type="checkbox" id="StreamSaver" save="change" />
+            </label>
+            <label class="m3u8checkbox textColor">
+              <p>另存为:</p><input type="checkbox" id="saveAs" save="change" />
+            </label>
+            <label class="m3u8checkbox textColor">
+              <p>跳过解密:</p><input type="checkbox" id="skipDecrypt" save="change" />
+            </label>
+            <label class="m3u8checkbox textColor">
+              <p>下载完成后自动关闭页面:</p><input type="checkbox" id="autoClose" save="change" />
+            </label>
+            <div class="rangeDown textColor">
+              <p>下载范围:</p>
+              <select id="cc" class="hide">
+                <option disabled selected hidden>playlist</option>
+              </select>
+              <div class="merge">
+                <input type="text" id="rangeStart" spellcheck="false" placeholder="开始" value="1" />
+                <input type="text" id="rangeEnd" spellcheck="false" placeholder="结束" />
+              </div>
+            </div>
+            <button id="recorder" class="button2 hide" data-switch="on">录制直播</button>
+            <div class="textColor m3u8checkbox">
+              <p>重试次数:</p>(test) <input type="number" value="0" id="retryCount" spellcheck="false" style="width: 35px;" step="1" min="0" />
+            </div>
+            <button id="mergeTs" class="button2">开始下载</button>
+            <button id="backendDownload" class="button2" style="background-color: #6f42c1; color: white;">🚀 后台下载</button>
+            <button id="errorDownload" class="hide button2">重下失败项</button>
+            <button id="ForceDownload" class="hide button2">下载现有数据</button>
+            <button id="stopDownload" class="hide button2">停止下载</button>
+            <button id="convertToMp4" class="button2 hide" style="background-color: #28a745;">转换为MP4</button>
+          </div>
+          <div style="display: flex; margin-top: 10px;">
+            <div id="progress"></div>
+            <div id="fileSize"></div>
+            <div id="fileDuration"></div>
+          </div>
+          <div class="block hide" id="errorTsList"></div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <script src="lib/m3u8-decrypt.js"></script>
+  <script src="lib/hls.min.js"></script>
+  <script src="lib/base64.js"></script>
+  <script src="lib/StreamSaver.js"></script>
+  <script src="js/m3u8.downloader.js"></script>
+  <script src="js/m3u8.segment-downloader.js"></script>
+  <script src="js/m3u8-download.js"></script>
+  <script src="js/i18n.js"></script>
+</body>
+
+</html>

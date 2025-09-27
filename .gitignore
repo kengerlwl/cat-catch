@@ -4,3 +4,7 @@ dist/
 *.crx
 *.zip
 *.pem
+/flask-m3u8-manager/downloads
+/flask-m3u8-manager/venv
+*.pyc
+.catpaw/rules/main.md

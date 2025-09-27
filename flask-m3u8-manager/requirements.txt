@@ -1,0 +1,18 @@
+# Flask 核心框架
+Flask==2.3.3
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.0.5
+Werkzeug==2.3.7
+
+# HTTP 请求和 M3U8 处理
+requests==2.31.0
+m3u8==3.5.0
+
+# 加密解密库
+pycryptodomex==3.23.0
+
+# 数据处理
+urllib3==2.0.7
+
+# 可选：更好的错误处理和日志
+colorlog==6.8.2

@@ -65,9 +65,27 @@
       <h1 class="optionsTitle" data-i18n="titleM3U8"></h1>
       <span class="explain" id="key"></span>
 
+      <!-- 新功能导航 -->
+      <div class="block" style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; color: #1976d2;">🆕 新功能</h3>
+        <p style="margin: 10px 0; color: #666;">现在支持分离式下载和转换流程：</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="window.open('m3u8-download.html', '_blank')" class="button2" style="background-color: #2196f3;">
+            📥 仅下载M3U8
+          </button>
+          <button onclick="window.open('mp4-converter.html', '_blank')" class="button2" style="background-color: #4caf50;">
+            🔄 转换为MP4
+          </button>
+        </div>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #888;">
+          • 仅下载：只下载m3u8视频，不自动转换<br>
+          • 转换器：批量将本地m3u8文件转换为mp4
+        </p>
+      </div>
+
       <!-- 队列管理设置 -->
       <div class="queue-settings">
-        <h3>队列管理设置</h3>
+        <h3>🚀 队列管理设置</h3>
         <div class="queue-settings-row">
           <label class="queue-checkbox">
             <input type="checkbox" id="enableQueueManagement" save="change" />
@@ -84,6 +102,11 @@
           </label>
         </div>
         <div class="queue-settings-row">
+          <label class="queue-checkbox">
+            切片线程数:
+            <input type="number" id="segmentThreadCount" class="queue-number-input"
+                   value="6" min="1" max="16" save="change" />
+          </label>
           <button id="addToQueueBtn" class="btn btn-info" style="display: none;">添加到队列</button>
           <button id="showQueueManager" class="btn btn-secondary">显示队列管理器</button>
         </div>

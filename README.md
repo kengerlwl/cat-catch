@@ -3,6 +3,31 @@
 # 📑简介
 猫抓(cat-catch) 资源嗅探扩展，能够帮你筛选列出当前页面的资源。
 
+## 🆕 新功能: Flask M3U8 下载管理器
+现在集成了强大的Flask后台下载管理系统！
+
+### ✨ 主要特性
+- **🎬 Web管理界面**: 现代化的Web界面管理所有下载任务
+- **🚀 一键后台下载**: 在m3u8下载页面新增"后台下载"按钮，直接发送任务到后台
+- **📊 实时监控**: 实时显示下载进度、状态和详细信息
+- **⏸️ 任务控制**: 支持暂停、恢复、删除下载任务
+- **🔄 MP4转换**: 下载完成后可转换为MP4格式
+- **💾 断点续传**: 支持下载中断后继续下载
+- **🎯 批量管理**: 同时管理多个下载任务
+
+### 🚀 快速开始
+```bash
+cd flask-m3u8-manager
+# Windows用户
+start.bat
+# Linux/macOS用户
+./start.sh
+```
+
+访问 http://localhost:5001 打开管理界面
+
+详细说明请查看 [Flask M3U8 下载管理器文档](flask-m3u8-manager/README.md)
+
 # 📖安装地址
 ## 🐴Chrome
 https://chrome.google.com/webstore/detail/jfedfbgedapdagkghmgibemcoggfppbb

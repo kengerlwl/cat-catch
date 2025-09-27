@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>MP4 转换器</title>
+  <link rel="stylesheet" type="text/css" href="css/public.css" media="all" />
+  <link rel="stylesheet" type="text/css" href="css/options.css" media="all" />
+  <link rel="stylesheet" type="text/css" href="css/converter.css" media="all" />
+  <script src="lib/jquery.min.js"></script>
+  <script src="js/init.js"></script>
+  <script src="js/firefox.js"></script>
+  <script src="lib/mux.min.js"></script>
+  <script src="js/function.js"></script>
+</head>
+
+<body>
+  <div class="m3u8_wrapper wrapper1080">
+
+    <section id="loading">
+      <div class="optionBox" data-i18n="loading">加载中...</div>
+    </section>
+
+    <section id="converter" class="hide">
+      <h1 class="optionsTitle">MP4 转换器</h1>
+      <span class="explain">将本地的m3u8文件转换为mp4格式，支持批量转换</span>
+
+      <div class="optionBox">
+        <!-- 文件选择区域 -->
+        <div class="block">
+          <h3>选择要转换的文件</h3>
+          <div class="file-input-area">
+            <input type="file" id="fileInput" multiple accept=".m3u8,.ts" />
+            <button id="addFiles" class="button2">添加文件</button>
+            <button id="addFolder" class="button2">添加文件夹</button>
+            <button id="clearAll" class="button2">清空列表</button>
+          </div>
+          <div class="drag-drop-area" id="dragDropArea">
+            <p>拖拽文件到这里或点击上方按钮选择文件</p>
+            <p>支持 .m3u8 和 .ts 文件</p>
+          </div>
+        </div>
+
+        <!-- 转换设置 -->
+        <div class="block">
+          <h3>转换设置</h3>
+          <div class="converter-settings">
+            <div class="settings-row">
+              <label class="m3u8checkbox textColor">
+                <p>仅提取音频:</p><input type="checkbox" id="onlyAudio" />
+              </label>
+              <label class="m3u8checkbox textColor">
+                <p>使用FFmpeg转码:</p><input type="checkbox" id="useFFmpeg" checked />
+              </label>
+              <label class="m3u8checkbox textColor">
+                <p>保持原始文件名:</p><input type="checkbox" id="keepOriginalName" checked />
+              </label>
+            </div>
+            <div class="settings-row">
+              <div class="textColor">
+                <p>输出目录:</p>
+                <input type="text" id="outputDir" placeholder="选择输出目录" class="fullInput" />
+                <button id="selectOutputDir" class="button">选择目录</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div class="textColor">
+                <p>最大并发转换数:</p>
+                <input type="number" id="maxConcurrent" value="2" min="1" max="5" style="width: 60px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务列表 -->
+        <div class="block">
+          <h3>转换任务列表</h3>
+          <div class="task-controls">
+            <button id="startAllConversion" class="button2" style="background-color: #28a745;">开始全部转换</button>
+            <button id="pauseAllConversion" class="button2" style="background-color: #ffc107;">暂停全部</button>
+            <button id="stopAllConversion" class="button2" style="background-color: #dc3545;">停止全部</button>
+            <button id="removeCompleted" class="button">移除已完成</button>
+            <button id="removeFailed" class="button">移除失败项</button>
+          </div>
+
+          <div id="taskList" class="task-list">
+            <div class="empty-state">
+              <p>暂无转换任务，请先添加文件</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 全局进度 -->
+        <div class="block">
+          <h3>总体进度</h3>
+          <div class="global-progress">
+            <div class="progress-info">
+              <span id="globalProgress">等待开始...</span>
+              <span id="globalStats">0/0 完成</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="globalProgressBar" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <script src="lib/m3u8-decrypt.js"></script>
+  <script src="lib/hls.min.js"></script>
+  <script src="lib/base64.js"></script>
+  <script src="js/m3u8.downloader.js"></script>
+  <script src="js/mp4-converter.js"></script>
+  <script src="js/i18n.js"></script>
+</body>
+
+</html>

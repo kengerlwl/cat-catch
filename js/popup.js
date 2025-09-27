@@ -115,6 +115,7 @@ function AddMedia(data, currentTab = true) {
                 <img src="img/invoke.svg" class="icon invoke ${G.invoke ? "" : "hide"}"" id="invoke" title="${i18n.invoke}"/>
                 <img src="img/send.svg" class="icon send ${G.send2localManual || G.send2local ? "" : "hide"}"" id="send2local" title="${i18n.send2local}"/>
                 <img src="img/mqtt.svg" class="icon mqtt ${G.mqttEnable ? "" : "hide"}" id="mqtt" title="${i18n.send2MQTT}"/>
+                <img src="img/backend.svg" class="icon backend ${data.parsing == "m3u8" ? "" : "hide"}" id="backendDownload" title="后台下载"/>
             </div>
             <div class="url hide">
                 <div id="mediaInfo" data-state="false">
@@ -389,6 +390,68 @@ function AddMedia(data, currentTab = true) {
             // 恢复按钮状态
             $mqttButton.removeClass('mqtt-sending').prop('disabled', false);
         });
+        return false;
+    });
+
+    // 后台下载
+    data.html.find("#backendDownload").click(function () {
+        const $backendButton = $(this);
+
+        // 防止重复点击
+        if ($backendButton.hasClass('backend-sending')) {
+            return false;
+        }
+
+        // 只处理M3U8文件
+        if (!isM3U8(data)) {
+            Tips("仅支持M3U8文件的后台下载", 2000);
+            return false;
+        }
+
+        // 禁用按钮并添加发送中状态
+        $backendButton.addClass('backend-sending').prop('disabled', true);
+        Tips("正在添加到后台下载队列...", 2000);
+
+        // 发送到Flask后台
+        const taskData = {
+            url: data.url,
+            title: data.title || data.name,
+            custom_dir: data.downFileName || ""
+        };
+
+        fetch('http://localhost:5001/api/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(taskData)
+        })
+        .then(response => response.json())
+        .then(responseData => {
+            if (responseData.task_id) {
+                Tips("任务已添加到后台下载队列！任务ID: " + responseData.task_id, 3000);
+
+                // 询问是否打开管理界面
+                if (confirm("是否打开下载管理界面？")) {
+                    if (G.isFirefox) {
+                        window.location.href = 'http://localhost:5001';
+                    } else {
+                        chrome.tabs.create({ url: 'http://localhost:5001' });
+                    }
+                }
+            } else {
+                Tips("添加任务失败: " + (responseData.error || "未知错误"), 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Backend download error:', error);
+            Tips("网络错误: " + error.message, 3000);
+        })
+        .finally(() => {
+            // 恢复按钮状态
+            $backendButton.removeClass('backend-sending').prop('disabled', false);
+        });
+
         return false;
     });
 
