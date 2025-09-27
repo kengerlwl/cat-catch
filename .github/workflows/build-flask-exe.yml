@@ -1,0 +1,121 @@
+name: Build Flask M3U8 Manager EXE
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'flask-m3u8-manager/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'flask-m3u8-manager/**'
+  workflow_dispatch:
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd flask-m3u8-manager
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Prepare build environment
+      run: |
+        cd flask-m3u8-manager
+        # 确保所有必要的目录存在
+        if not exist templates mkdir templates
+        if not exist static mkdir static
+        if not exist downloads mkdir downloads
+        # 检查spec文件是否存在
+        if exist flask_m3u8_manager.spec (
+          echo "Using existing spec file"
+        ) else (
+          echo "Spec file not found, will be created by PyInstaller"
+        )
+
+    - name: Build EXE with PyInstaller
+      run: |
+        cd flask-m3u8-manager
+        pyinstaller flask_m3u8_manager.spec --clean --noconfirm
+
+    - name: Create release package
+      run: |
+        cd flask-m3u8-manager
+        mkdir release
+        copy dist\Flask-M3U8-Manager.exe release\
+        copy README.md release\
+        copy requirements.txt release\
+        echo "Flask M3U8 Manager - Portable Version" > release\README_EXE.txt
+        echo "" >> release\README_EXE.txt
+        echo "This is a portable executable version of Flask M3U8 Manager." >> release\README_EXE.txt
+        echo "" >> release\README_EXE.txt
+        echo "Usage:" >> release\README_EXE.txt
+        echo "1. Double-click Flask-M3U8-Manager.exe to start the application" >> release\README_EXE.txt
+        echo "2. The application will start on http://localhost:5000" >> release\README_EXE.txt
+        echo "3. Your browser should automatically open to the management interface" >> release\README_EXE.txt
+        echo "" >> release\README_EXE.txt
+        echo "Features:" >> release\README_EXE.txt
+        echo "- M3U8 video download management" >> release\README_EXE.txt
+        echo "- Task queue and progress monitoring" >> release\README_EXE.txt
+        echo "- MP4 conversion support" >> release\README_EXE.txt
+        echo "- Integration with cat-catch browser extension" >> release\README_EXE.txt
+        echo "" >> release\README_EXE.txt
+        echo "Note: The downloads folder will be created in the same directory as the executable." >> release\README_EXE.txt
+
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Flask-M3U8-Manager-Windows-EXE
+        path: flask-m3u8-manager/release/
+        retention-days: 30
+
+    - name: Create Release (on main/master branch)
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Flask M3U8 Manager v${{ github.run_number }}
+        body: |
+          ## Flask M3U8 Manager - Windows Executable
+
+          ### 🎬 功能特性
+          - M3U8视频下载管理
+          - 任务队列和进度监控
+          - MP4格式转换支持
+          - 与cat-catch浏览器扩展集成
+
+          ### 📦 使用方法
+          1. 下载 `Flask-M3U8-Manager.exe`
+          2. 双击运行程序
+          3. 浏览器会自动打开管理界面 (http://localhost:5000)
+          4. 开始添加和管理下载任务
+
+          ### 🔧 系统要求
+          - Windows 10/11 (64位)
+          - 无需安装Python环境
+          - 建议预留足够的磁盘空间用于视频下载
+
+          ### 📝 更新内容
+          - 基于最新代码构建
+          - 包含所有依赖项的独立可执行文件
+          - 优化启动速度和稳定性
+
+        files: |
+          flask-m3u8-manager/release/Flask-M3U8-Manager.exe
+          flask-m3u8-manager/release/README_EXE.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

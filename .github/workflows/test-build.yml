@@ -1,0 +1,80 @@
+name: Test Build Flask EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_build:
+        description: 'Test build without release'
+        required: false
+        default: 'true'
+
+jobs:
+  test-build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd flask-m3u8-manager
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Test PyInstaller build
+      run: |
+        cd flask-m3u8-manager
+        echo "Testing PyInstaller build process..."
+        pyinstaller --version
+        python -c "import flask; print('Flask version:', flask.__version__)"
+        python -c "import requests; print('Requests version:', requests.__version__)"
+        python -c "import m3u8; print('M3U8 version:', m3u8.__version__)"
+
+    - name: Validate spec file
+      run: |
+        cd flask-m3u8-manager
+        if exist flask_m3u8_manager.spec (
+          echo "Spec file found, validating..."
+          python -c "exec(open('flask_m3u8_manager.spec').read()); print('Spec file is valid')"
+        ) else (
+          echo "No spec file found, will use default PyInstaller settings"
+        )
+
+    - name: Test build (dry run)
+      run: |
+        cd flask-m3u8-manager
+        echo "Running test build..."
+        if exist flask_m3u8_manager.spec (
+          pyinstaller flask_m3u8_manager.spec --clean --noconfirm --distpath test_dist
+        ) else (
+          pyinstaller start.py --name "Flask-M3U8-Manager-Test" --onefile --console --clean --noconfirm --distpath test_dist
+        )
+
+    - name: Verify build output
+      run: |
+        cd flask-m3u8-manager
+        if exist test_dist\Flask-M3U8-Manager.exe (
+          echo "✅ Build successful! EXE file created."
+          dir test_dist\Flask-M3U8-Manager.exe
+        ) else if exist test_dist\Flask-M3U8-Manager-Test.exe (
+          echo "✅ Build successful! Test EXE file created."
+          dir test_dist\Flask-M3U8-Manager-Test.exe
+        ) else (
+          echo "❌ Build failed! No EXE file found."
+          dir test_dist
+          exit 1
+        )
+
+    - name: Upload test artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Test-Build-Output
+        path: flask-m3u8-manager/test_dist/
+        retention-days: 7
