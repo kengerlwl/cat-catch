@@ -220,6 +220,13 @@ function start() {
         }
     });
 
+    // 重试尝试事件处理
+    down.on('retryAttempt', function (fragment, currentRetry, maxRetries, error) {
+        const $dom = itemDOM.get(fragment.index);
+        $dom.progressText.html(`重试中 ${currentRetry}/${maxRetries}`);
+        console.log(`切片 ${fragment.index} 正在进行第 ${currentRetry} 次重试，最大重试次数: ${maxRetries}`);
+    });
+
     // 错误处理
     down.on('downloadError', function (fragment, error) {
         // 添加range请求头 重新尝试下载

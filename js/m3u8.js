@@ -1338,6 +1338,13 @@ function downloadNew(start = 0, end = _fragments.length) {
             return tempBuffer ? tempBuffer.buffer : buffer;
         });
     }
+    // 重试尝试
+    down.on('retryAttempt', function (fragment, currentRetry, maxRetries, error) {
+        const $dom = itemDOM.get(fragment.index);
+        $dom.percentage.removeClass('error').html(`重试中 ${currentRetry}/${maxRetries}`);
+        console.log(`切片 ${fragment.index} 正在进行第 ${currentRetry} 次重试，最大重试次数: ${maxRetries}`);
+    });
+
     // 下载错误
     down.on('downloadError', function (fragment, error) {
         $("#ForceDownload").show(); // 强制下载

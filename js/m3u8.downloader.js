@@ -22,6 +22,8 @@ class Downloader {
         this.pushIndex = 0;              // 推送顺序下载索引
         this.controller = [];            // 储存中断控制器
         this.running = 0;                // 正在下载数量
+        this.maxRetries = 3;             // 最大重试次数
+        this.retryDelays = [1000, 2000, 3000]; // 重试延迟时间(毫秒)
     }
     /**
      * 设置监听
@@ -60,6 +62,15 @@ class Downloader {
      */
     setTranscode(callback) {
         this.transcode = callback;
+    }
+    /**
+     * 设置重试参数
+     * @param {number} maxRetries 最大重试次数
+     * @param {Array<number>} retryDelays 重试延迟时间数组(毫秒)
+     */
+    setRetryConfig(maxRetries = 3, retryDelays = [1000, 2000, 3000]) {
+        this.maxRetries = maxRetries;
+        this.retryDelays = retryDelays;
     }
     /**
      * 停止下载 没有目标 停止所有线程
@@ -198,6 +209,11 @@ class Downloader {
         this.state = 'running';
         this.running++;
 
+        // 初始化重试计数
+        if (fragment.retryCount === undefined) {
+            fragment.retryCount = 0;
+        }
+
         // 资源已下载 跳过
         // if (this.buffer[fragment.index]) { return; }
 
@@ -264,6 +280,9 @@ class Downloader {
                 this.buffersize += buffer.byteLength;
                 this.duration += fragment.duration ?? 0;
 
+                // 重置重试计数（下载成功）
+                fragment.retryCount = 0;
+
                 // 下载对象来自错误列表 从错误列表内删除
                 this.errorList.has(fragment) && this.errorList.delete(fragment);
 
@@ -283,15 +302,44 @@ class Downloader {
                     this.emit('stop', fragment, error);
                     return;
                 }
+
+                // 重试逻辑
+                if (fragment.retryCount < this.maxRetries) {
+                    fragment.retryCount++;
+                    const retryDelay = this.retryDelays[fragment.retryCount - 1] || 3000;
+
+                    console.log(`切片 ${fragment.index} 下载失败，${retryDelay}ms后进行第${fragment.retryCount}次重试`);
+                    this.emit('retryAttempt', fragment, fragment.retryCount, this.maxRetries, error);
+
+                    // 延迟后重试
+                    setTimeout(() => {
+                        if (this.state !== 'abort') {
+                            this.downloader(fragment); // 重新下载该切片
+                        }
+                    }, retryDelay);
+                    return;
+                }
+
+                // 重试次数用完，标记为最终失败
+                console.log(`切片 ${fragment.index} 重试${this.maxRetries}次后仍然失败`);
                 this.emit('downloadError', fragment, error);
 
                 // 储存下载错误切片
                 !this.errorList.has(fragment) && this.errorList.add(fragment);
             }).finally(() => {
-                this.running--;
-                // 下载下一个切片
-                if (!directDownload && this.index < this.fragments.length) {
-                    this.downloader();
+                // 检查是否需要减少运行计数和继续下载
+                // 条件：1. 下载成功 2. 重试次数已用完且不是正在重试 3. 被中止
+                const isRetrying = fragment.retryCount > 0 && fragment.retryCount < this.maxRetries;
+                const shouldContinue = this.buffer[fragment.index] ||
+                                     (fragment.retryCount >= this.maxRetries) ||
+                                     this.state === 'abort';
+
+                if (shouldContinue && !isRetrying) {
+                    this.running--;
+                    // 下载下一个切片
+                    if (!directDownload && this.index < this.fragments.length && this.state !== 'abort') {
+                        this.downloader();
+                    }
                 }
             });
     }
