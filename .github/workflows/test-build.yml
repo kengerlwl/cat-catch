@@ -40,37 +40,37 @@ jobs:
     - name: Validate spec file
       run: |
         cd flask-m3u8-manager
-        if exist flask_m3u8_manager.spec (
-          echo "Spec file found, validating..."
+        if (Test-Path "flask_m3u8_manager.spec") {
+          Write-Host "Spec file found, validating..."
           python -c "exec(open('flask_m3u8_manager.spec').read()); print('Spec file is valid')"
-        ) else (
-          echo "No spec file found, will use default PyInstaller settings"
-        )
+        } else {
+          Write-Host "No spec file found, will use default PyInstaller settings"
+        }
 
     - name: Test build (dry run)
       run: |
         cd flask-m3u8-manager
-        echo "Running test build..."
-        if exist flask_m3u8_manager.spec (
+        Write-Host "Running test build..."
+        if (Test-Path "flask_m3u8_manager.spec") {
           pyinstaller flask_m3u8_manager.spec --clean --noconfirm --distpath test_dist
-        ) else (
+        } else {
           pyinstaller start.py --name "Flask-M3U8-Manager-Test" --onefile --console --clean --noconfirm --distpath test_dist
-        )
+        }
 
     - name: Verify build output
       run: |
         cd flask-m3u8-manager
-        if exist test_dist\Flask-M3U8-Manager.exe (
-          echo "✅ Build successful! EXE file created."
-          dir test_dist\Flask-M3U8-Manager.exe
-        ) else if exist test_dist\Flask-M3U8-Manager-Test.exe (
-          echo "✅ Build successful! Test EXE file created."
-          dir test_dist\Flask-M3U8-Manager-Test.exe
-        ) else (
-          echo "❌ Build failed! No EXE file found."
-          dir test_dist
+        if (Test-Path "test_dist\Flask-M3U8-Manager.exe") {
+          Write-Host "✅ Build successful! EXE file created."
+          Get-ChildItem "test_dist\Flask-M3U8-Manager.exe"
+        } elseif (Test-Path "test_dist\Flask-M3U8-Manager-Test.exe") {
+          Write-Host "✅ Build successful! Test EXE file created."
+          Get-ChildItem "test_dist\Flask-M3U8-Manager-Test.exe"
+        } else {
+          Write-Host "❌ Build failed! No EXE file found."
+          Get-ChildItem "test_dist"
           exit 1
-        )
+        }
 
     - name: Upload test artifact
       uses: actions/upload-artifact@v4

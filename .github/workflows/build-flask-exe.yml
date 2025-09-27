@@ -35,15 +35,15 @@ jobs:
       run: |
         cd flask-m3u8-manager
         # 确保所有必要的目录存在
-        if not exist templates mkdir templates
-        if not exist static mkdir static
-        if not exist downloads mkdir downloads
+        if (!(Test-Path "templates")) { New-Item -ItemType Directory -Path "templates" }
+        if (!(Test-Path "static")) { New-Item -ItemType Directory -Path "static" }
+        if (!(Test-Path "downloads")) { New-Item -ItemType Directory -Path "downloads" }
         # 检查spec文件是否存在
-        if exist flask_m3u8_manager.spec (
-          echo "Using existing spec file"
-        ) else (
-          echo "Spec file not found, will be created by PyInstaller"
-        )
+        if (Test-Path "flask_m3u8_manager.spec") {
+          Write-Host "Using existing spec file"
+        } else {
+          Write-Host "Spec file not found, will be created by PyInstaller"
+        }
 
     - name: Build EXE with PyInstaller
       run: |
@@ -53,26 +53,31 @@ jobs:
     - name: Create release package
       run: |
         cd flask-m3u8-manager
-        mkdir release
-        copy dist\Flask-M3U8-Manager.exe release\
-        copy README.md release\
-        copy requirements.txt release\
-        echo "Flask M3U8 Manager - Portable Version" > release\README_EXE.txt
-        echo "" >> release\README_EXE.txt
-        echo "This is a portable executable version of Flask M3U8 Manager." >> release\README_EXE.txt
-        echo "" >> release\README_EXE.txt
-        echo "Usage:" >> release\README_EXE.txt
-        echo "1. Double-click Flask-M3U8-Manager.exe to start the application" >> release\README_EXE.txt
-        echo "2. The application will start on http://localhost:5000" >> release\README_EXE.txt
-        echo "3. Your browser should automatically open to the management interface" >> release\README_EXE.txt
-        echo "" >> release\README_EXE.txt
-        echo "Features:" >> release\README_EXE.txt
-        echo "- M3U8 video download management" >> release\README_EXE.txt
-        echo "- Task queue and progress monitoring" >> release\README_EXE.txt
-        echo "- MP4 conversion support" >> release\README_EXE.txt
-        echo "- Integration with cat-catch browser extension" >> release\README_EXE.txt
-        echo "" >> release\README_EXE.txt
-        echo "Note: The downloads folder will be created in the same directory as the executable." >> release\README_EXE.txt
+        New-Item -ItemType Directory -Path "release" -Force
+        Copy-Item "dist\Flask-M3U8-Manager.exe" "release\"
+        Copy-Item "README.md" "release\"
+        Copy-Item "requirements.txt" "release\"
+
+        $readmeContent = @"
+Flask M3U8 Manager - Portable Version
+
+This is a portable executable version of Flask M3U8 Manager.
+
+Usage:
+1. Double-click Flask-M3U8-Manager.exe to start the application
+2. The application will start on http://localhost:5000
+3. Your browser should automatically open to the management interface
+
+Features:
+- M3U8 video download management
+- Task queue and progress monitoring
+- MP4 conversion support
+- Integration with cat-catch browser extension
+
+Note: The downloads folder will be created in the same directory as the executable.
+"@
+
+        $readmeContent | Out-File -FilePath "release\README_EXE.txt" -Encoding UTF8
 
     - name: Upload EXE artifact
       uses: actions/upload-artifact@v4
