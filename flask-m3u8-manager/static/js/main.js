@@ -9,6 +9,8 @@ class M3U8Manager {
         this.refreshInterval = null;
         this.fastRefreshInterval = null;
         this.hasActiveTasks = false;
+        // 新增：保存选中状态，从本地存储恢复
+        this.selectedTaskIds = this.loadSelectionFromStorage();
 
         this.init();
     }
@@ -25,6 +27,25 @@ class M3U8Manager {
 
         // 刷新任务列表
         $('#refreshBtn').click(() => this.manualRefresh());
+
+        // 批量操作相关
+        $('#selectAllTasks').change(() => this.toggleSelectAll());
+        $('#batchPauseBtn').click(() => this.batchPause());
+        $('#batchResumeBtn').click(() => this.batchResume());
+        $('#batchConvertBtn').click(() => this.batchConvert());
+        $('#batchDeleteBtn').click(() => this.batchDelete());
+
+        // 任务复选框变化事件（使用事件委托）
+        $(document).on('change', '.task-checkbox', (e) => {
+            const taskId = $(e.target).data('task-id');
+            if ($(e.target).prop('checked')) {
+                this.selectedTaskIds.add(taskId);
+            } else {
+                this.selectedTaskIds.delete(taskId);
+            }
+            this.saveSelectionToStorage();
+            this.updateBatchControls();
+        });
 
         // 设置相关
         $('#settingsBtn').click(() => this.showSettings());
@@ -48,6 +69,10 @@ class M3U8Manager {
         // 编辑任务相关
         $('#saveEditBtn').click(() => this.saveEdit());
         $('#cancelEditBtn').click(() => this.cancelEdit());
+
+        // 批量转换模态框相关
+        $('#stopBatchConvertBtn').click(() => this.stopBatchConvert());
+        $('#closeBatchConvertBtn').click(() => this.closeBatchConvertModal());
 
         // 回车键添加任务
         $('#m3u8Url').keypress((e) => {
@@ -148,11 +173,33 @@ class M3U8Manager {
                     <p>添加您的第一个M3U8下载任务吧！</p>
                 </div>
             `);
+            // 清空选中状态和批量控件状态
+            this.selectedTaskIds.clear();
+            this.saveSelectionToStorage();
+            $('#selectedCount').text('已选择 0 个任务');
+            $('#selectAllTasks').prop('checked', false).prop('indeterminate', false);
+            $('.batch-actions .btn').prop('disabled', true);
             return;
+        }
+
+        // 清理不存在的任务ID
+        const currentTaskIds = new Set(this.tasks.map(task => task.task_id));
+        const originalSize = this.selectedTaskIds.size;
+        this.selectedTaskIds = new Set([...this.selectedTaskIds].filter(id => currentTaskIds.has(id)));
+
+        // 如果清理了一些任务ID，保存到本地存储
+        if (this.selectedTaskIds.size !== originalSize) {
+            this.saveSelectionToStorage();
         }
 
         const tasksHtml = this.tasks.map(task => this.renderTaskItem(task)).join('');
         $tasksList.html(tasksHtml);
+
+        // 恢复选中状态
+        this.restoreSelectionState();
+
+        // 渲染完成后更新批量控件状态
+        setTimeout(() => this.updateBatchControls(), 0);
     }
 
     renderTaskItem(task) {
@@ -162,56 +209,60 @@ class M3U8Manager {
 
         return `
             <div class="task-item" data-task-id="${task.task_id}">
-                <div class="task-header">
-                    <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
-                    <span class="task-status ${statusClass}">${statusText}</span>
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-task-id="${task.task_id}">
                 </div>
+                <div class="task-content">
+                    <div class="task-header">
+                        <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
+                        <span class="task-status ${statusClass}">${statusText}</span>
+                    </div>
 
-                <div class="task-info">
-                    <div class="info-row">
-                        <span class="info-label">进度:</span>
-                        <span class="info-value">${task.progress}% (${task.downloaded_segments}/${task.total_segments})</span>
-                        ${task.status === 'downloading' ? `
-                            <span class="info-label" style="margin-left: 20px;">速度:</span>
-                            <span class="info-value">${this.formatSpeed(task.download_speed || 0)}</span>
-                        ` : ''}
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill ${task.status === 'downloading' ? 'active' : ''}" style="width: ${task.progress}%"></div>
-                        ${task.status === 'downloading' ? '<div class="progress-glow"></div>' : ''}
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">线程数:</span>
-                        <span class="info-value">${task.thread_count || 6}</span>
-                        <span class="info-label" style="margin-left: 20px;">创建时间:</span>
-                        <span class="info-value">${createdAt}</span>
-                        ${task.file_size > 0 ? `
-                            <span class="info-label" style="margin-left: 20px;">文件大小:</span>
-                            <span class="info-value">${this.formatFileSize(task.file_size)}</span>
-                        ` : ''}
-                        ${task.is_converted ? `
-                            <span class="info-label" style="margin-left: 20px;">转换时间:</span>
-                            <span class="info-value">${new Date(task.converted_at).toLocaleString()}</span>
-                        ` : ''}
-                    </div>
-                    ${task.status === 'downloading' && task.total_segments > 0 ? `
+                    <div class="task-info">
                         <div class="info-row">
-                            <span class="info-label">预计剩余:</span>
-                            <span class="info-value">${this.estimateRemainingTime(task)}</span>
+                            <span class="info-label">进度:</span>
+                            <span class="info-value">${task.progress}% (${task.downloaded_segments}/${task.total_segments})</span>
+                            ${task.status === 'downloading' ? `
+                                <span class="info-label">速度:</span>
+                                <span class="info-value">${this.formatSpeed(task.download_speed || 0)}</span>
+                            ` : ''}
                         </div>
-                    ` : ''}
-                    ${task.error_message ? `
+                        <div class="progress-bar">
+                            <div class="progress-fill ${task.status === 'downloading' ? 'active' : ''}" style="width: ${task.progress}%"></div>
+                        </div>
                         <div class="info-row">
-                            <span class="info-label">错误信息:</span>
-                            <span class="info-value" style="color: #dc3545;">${this.escapeHtml(task.error_message)}</span>
+                            <span class="info-label">线程数:</span>
+                            <span class="info-value">${task.thread_count || 6}</span>
+                            <span class="info-label">创建时间:</span>
+                            <span class="info-value">${createdAt}</span>
+                            ${task.file_size > 0 ? `
+                                <span class="info-label">文件大小:</span>
+                                <span class="info-value">${this.formatFileSize(task.file_size)}</span>
+                            ` : ''}
+                            ${task.is_converted ? `
+                                <span class="info-label">转换时间:</span>
+                                <span class="info-value">${new Date(task.converted_at).toLocaleString()}</span>
+                            ` : ''}
                         </div>
-                    ` : ''}
-                </div>
+                        ${task.status === 'downloading' && task.total_segments > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">预计剩余:</span>
+                                <span class="info-value">${this.estimateRemainingTime(task)}</span>
+                            </div>
+                        ` : ''}
+                        ${task.error_message ? `
+                            <div class="info-row">
+                                <span class="info-label">错误信息:</span>
+                                <span class="info-value" style="color: #dc3545;">${this.escapeHtml(task.error_message)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
 
-                <div class="task-url">${this.escapeHtml(task.url)}</div>
+                    <div class="task-url">${this.escapeHtml(task.url)}</div>
 
-                <div class="task-actions">
-                    ${this.renderTaskActions(task)}
+                    <div class="task-actions">
+                        ${this.renderTaskActions(task)}
+                    </div>
                 </div>
             </div>
         `;
@@ -586,6 +637,371 @@ class M3U8Manager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // 恢复选中状态
+    restoreSelectionState() {
+        $('.task-checkbox').each((index, checkbox) => {
+            const $checkbox = $(checkbox);
+            const taskId = $checkbox.data('task-id');
+            const isSelected = this.selectedTaskIds.has(taskId);
+
+            $checkbox.prop('checked', isSelected);
+            const taskItem = $checkbox.closest('.task-item');
+            if (isSelected) {
+                taskItem.addClass('selected');
+            } else {
+                taskItem.removeClass('selected');
+            }
+        });
+    }
+
+    // 批量操作相关方法
+    toggleSelectAll() {
+        const selectAllCheckbox = $('#selectAllTasks');
+        const taskCheckboxes = $('.task-checkbox');
+        const isChecked = selectAllCheckbox.prop('checked');
+
+        // 更新内存中的选中状态
+        if (isChecked) {
+            taskCheckboxes.each((index, checkbox) => {
+                const taskId = $(checkbox).data('task-id');
+                this.selectedTaskIds.add(taskId);
+            });
+        } else {
+            this.selectedTaskIds.clear();
+        }
+
+        taskCheckboxes.prop('checked', isChecked);
+        taskCheckboxes.each(function() {
+            const taskItem = $(this).closest('.task-item');
+            if (isChecked) {
+                taskItem.addClass('selected');
+            } else {
+                taskItem.removeClass('selected');
+            }
+        });
+
+        this.saveSelectionToStorage();
+        this.updateBatchControls();
+    }
+
+    updateBatchControls() {
+        const selectedTasks = this.getSelectedTasks();
+        const selectedCount = selectedTasks.length;
+
+        // 更新选中数量显示
+        $('#selectedCount').text(`已选择 ${selectedCount} 个任务`);
+
+        // 更新全选复选框状态
+        const totalTasks = $('.task-checkbox').length;
+        const selectAllCheckbox = $('#selectAllTasks');
+        if (selectedCount === 0) {
+            selectAllCheckbox.prop('indeterminate', false);
+            selectAllCheckbox.prop('checked', false);
+        } else if (selectedCount === totalTasks) {
+            selectAllCheckbox.prop('indeterminate', false);
+            selectAllCheckbox.prop('checked', true);
+        } else {
+            selectAllCheckbox.prop('indeterminate', true);
+        }
+
+        // 更新批量操作按钮状态
+        const hasSelected = selectedCount > 0;
+        $('#batchPauseBtn').prop('disabled', !hasSelected);
+        $('#batchResumeBtn').prop('disabled', !hasSelected);
+        $('#batchConvertBtn').prop('disabled', !hasSelected);
+        $('#batchDeleteBtn').prop('disabled', !hasSelected);
+
+        // 根据选中任务的状态智能启用/禁用按钮
+        if (hasSelected) {
+            const canPause = selectedTasks.some(task => task.status === 'downloading');
+            const canResume = selectedTasks.some(task => ['paused', 'failed'].includes(task.status));
+            const canConvert = selectedTasks.some(task => task.status === 'completed' && !task.is_converted);
+
+            $('#batchPauseBtn').prop('disabled', !canPause);
+            $('#batchResumeBtn').prop('disabled', !canResume);
+            $('#batchConvertBtn').prop('disabled', !canConvert);
+        }
+
+        // 更新任务项的选中样式
+        $('.task-checkbox').each(function() {
+            const taskItem = $(this).closest('.task-item');
+            if ($(this).prop('checked')) {
+                taskItem.addClass('selected');
+            } else {
+                taskItem.removeClass('selected');
+            }
+        });
+    }
+
+    getSelectedTasks() {
+        return this.tasks.filter(task => this.selectedTaskIds.has(task.task_id));
+    }
+
+    // 本地存储相关方法
+    loadSelectionFromStorage() {
+        try {
+            const stored = localStorage.getItem('m3u8_selected_tasks');
+            if (stored) {
+                const taskIds = JSON.parse(stored);
+                return new Set(taskIds);
+            }
+        } catch (error) {
+            console.warn('加载选中状态失败:', error);
+        }
+        return new Set();
+    }
+
+    saveSelectionToStorage() {
+        try {
+            const taskIds = Array.from(this.selectedTaskIds);
+            localStorage.setItem('m3u8_selected_tasks', JSON.stringify(taskIds));
+        } catch (error) {
+            console.warn('保存选中状态失败:', error);
+        }
+    }
+
+    clearSelectionStorage() {
+        try {
+            localStorage.removeItem('m3u8_selected_tasks');
+        } catch (error) {
+            console.warn('清除选中状态失败:', error);
+        }
+    }
+
+    async batchPause() {
+        const selectedTasks = this.getSelectedTasks().filter(task => task.status === 'downloading');
+
+        if (selectedTasks.length === 0) {
+            this.showNotification('没有可暂停的任务', 'warning');
+            return;
+        }
+
+        if (!confirm(`确定要暂停 ${selectedTasks.length} 个任务吗？`)) {
+            return;
+        }
+
+        this.showNotification('正在批量暂停任务...', 'info');
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const task of selectedTasks) {
+            try {
+                const response = await fetch(`/api/tasks/${task.task_id}/pause`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        this.showNotification(`批量暂停完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+                            failCount > 0 ? 'warning' : 'success');
+        this.loadTasks();
+    }
+
+    async batchResume() {
+        const selectedTasks = this.getSelectedTasks().filter(task =>
+            ['paused', 'failed'].includes(task.status));
+
+        if (selectedTasks.length === 0) {
+            this.showNotification('没有可恢复的任务', 'warning');
+            return;
+        }
+
+        if (!confirm(`确定要恢复 ${selectedTasks.length} 个任务吗？`)) {
+            return;
+        }
+
+        this.showNotification('正在批量恢复任务...', 'info');
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const task of selectedTasks) {
+            try {
+                const response = await fetch(`/api/tasks/${task.task_id}/resume`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        this.showNotification(`批量恢复完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+                            failCount > 0 ? 'warning' : 'success');
+        this.loadTasks();
+    }
+
+    async batchDelete() {
+        const selectedTasks = this.getSelectedTasks();
+
+        if (selectedTasks.length === 0) {
+            this.showNotification('没有选中的任务', 'warning');
+            return;
+        }
+
+        if (!confirm(`确定要删除 ${selectedTasks.length} 个任务吗？此操作不可恢复！`)) {
+            return;
+        }
+
+        this.showNotification('正在批量删除任务...', 'info');
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const task of selectedTasks) {
+            try {
+                const response = await fetch(`/api/tasks/${task.task_id}/delete`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        this.showNotification(`批量删除完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+                            failCount > 0 ? 'warning' : 'success');
+        this.loadTasks();
+    }
+
+    async batchConvert() {
+        const selectedTasks = this.getSelectedTasks().filter(task =>
+            task.status === 'completed' && !task.is_converted);
+
+        if (selectedTasks.length === 0) {
+            this.showNotification('没有可转换的任务（只能转换已完成且未转换的任务）', 'warning');
+            return;
+        }
+
+        if (!confirm(`确定要串行转换 ${selectedTasks.length} 个任务为MP4吗？这可能需要较长时间。`)) {
+            return;
+        }
+
+        // 显示批量转换进度模态框
+        this.showBatchConvertModal(selectedTasks);
+
+        // 开始串行转换
+        this.startBatchConvert(selectedTasks);
+    }
+
+    showBatchConvertModal(tasks) {
+        const modal = $('#batchConvertModal');
+        const progressList = $('#convertProgressList');
+
+        // 初始化进度显示
+        $('#convertOverallProgress').text(`0/${tasks.length}`);
+        $('#convertCurrentTask').text('准备开始...');
+
+        // 生成任务列表
+        let html = '';
+        tasks.forEach(task => {
+            html += `
+                <div class="convert-item" data-task-id="${task.task_id}">
+                    <div class="convert-info">
+                        <div class="convert-title">${this.escapeHtml(task.title)}</div>
+                        <div class="convert-status waiting">等待转换...</div>
+                    </div>
+                </div>
+            `;
+        });
+        progressList.html(html);
+
+        // 重置按钮状态
+        $('#stopBatchConvertBtn').prop('disabled', false);
+        $('#closeBatchConvertBtn').prop('disabled', true);
+
+        modal.show();
+    }
+
+    async startBatchConvert(tasks) {
+        this.batchConvertStopped = false;
+        let completedCount = 0;
+
+        for (let i = 0; i < tasks.length; i++) {
+            if (this.batchConvertStopped) {
+                break;
+            }
+
+            const task = tasks[i];
+
+            // 更新当前任务显示
+            $('#convertCurrentTask').text(`正在转换: ${task.title}`);
+
+            // 更新任务状态为转换中
+            const convertItem = $(`.convert-item[data-task-id="${task.task_id}"]`);
+            convertItem.removeClass('waiting').addClass('converting');
+            convertItem.find('.convert-status').removeClass('waiting').addClass('converting').text('转换中...');
+
+            try {
+                const response = await fetch(`/api/tasks/${task.task_id}/convert`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // 转换成功
+                    convertItem.removeClass('converting').addClass('completed');
+                    convertItem.find('.convert-status').removeClass('converting').addClass('completed').text('转换成功');
+                    completedCount++;
+                } else {
+                    // 转换失败
+                    convertItem.removeClass('converting').addClass('failed');
+                    convertItem.find('.convert-status').removeClass('converting').addClass('failed').text(`转换失败: ${data.error || '未知错误'}`);
+                }
+            } catch (error) {
+                // 网络错误
+                convertItem.removeClass('converting').addClass('failed');
+                convertItem.find('.convert-status').removeClass('converting').addClass('failed').text(`网络错误: ${error.message}`);
+            }
+
+            // 更新总进度
+            $('#convertOverallProgress').text(`${i + 1}/${tasks.length}`);
+        }
+
+        // 转换完成
+        $('#convertCurrentTask').text(this.batchConvertStopped ? '转换已停止' : '转换完成');
+        $('#stopBatchConvertBtn').prop('disabled', true);
+        $('#closeBatchConvertBtn').prop('disabled', false);
+
+        if (!this.batchConvertStopped) {
+            this.showNotification(`批量转换完成：成功 ${completedCount} 个，失败 ${tasks.length - completedCount} 个`,
+                                completedCount === tasks.length ? 'success' : 'warning');
+        }
+
+        // 刷新任务列表
+        this.loadTasks();
+    }
+
+    stopBatchConvert() {
+        this.batchConvertStopped = true;
+        $('#convertCurrentTask').text('正在停止转换...');
+        $('#stopBatchConvertBtn').prop('disabled', true);
+    }
+
+    closeBatchConvertModal() {
+        $('#batchConvertModal').hide();
     }
 
     formatSpeed(speed) {

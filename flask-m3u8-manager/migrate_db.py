@@ -38,6 +38,26 @@ def migrate_database():
             cursor.execute("ALTER TABLE download_records ADD COLUMN converted_at DATETIME")
             needs_migration = True
 
+        # 检查是否需要创建 config 表
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='config'")
+        config_table_exists = cursor.fetchone() is not None
+
+        if not config_table_exists:
+            print("创建 config 表...")
+            cursor.execute("""
+                CREATE TABLE config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key VARCHAR(100) NOT NULL UNIQUE,
+                    value TEXT NOT NULL,
+                    value_type VARCHAR(20) DEFAULT 'str',
+                    description VARCHAR(255) DEFAULT '',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_config_key ON config (key)")
+            needs_migration = True
+
         if needs_migration:
             # 更新已有的转换记录
             print("更新现有记录的转换状态...")

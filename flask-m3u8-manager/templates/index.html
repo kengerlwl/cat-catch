@@ -112,12 +112,30 @@
         <section class="tasks-section">
             <h2>📋 下载任务列表</h2>
             <div class="tasks-header">
-                <button id="refreshBtn" class="btn btn-secondary">🔄 刷新</button>
-                <div class="refresh-status">
-                    <span id="refreshIndicator" class="refresh-indicator">🔄</span>
-                    <span id="refreshMode" class="refresh-mode">智能刷新</span>
+                <div class="tasks-header-left">
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 刷新</button>
+                    <div class="refresh-status">
+                        <span id="refreshIndicator" class="refresh-indicator">🔄</span>
+                        <span id="refreshMode" class="refresh-mode">智能刷新</span>
+                    </div>
                 </div>
-                <span id="taskCount" class="task-count">共 0 个任务</span>
+                <div class="tasks-header-center">
+                    <div class="batch-controls">
+                        <label class="batch-select-all">
+                            <input type="checkbox" id="selectAllTasks"> 全选
+                        </label>
+                        <div class="batch-actions">
+                            <button id="batchPauseBtn" class="btn btn-warning" disabled>⏸️ 批量暂停</button>
+                            <button id="batchResumeBtn" class="btn btn-success" disabled>▶️ 批量恢复</button>
+                            <button id="batchConvertBtn" class="btn btn-info" disabled>🔄 批量转换MP4</button>
+                            <button id="batchDeleteBtn" class="btn btn-danger" disabled>🗑️ 批量删除</button>
+                        </div>
+                        <span id="selectedCount" class="selected-count">已选择 0 个任务</span>
+                    </div>
+                </div>
+                <div class="tasks-header-right">
+                    <span id="taskCount" class="task-count">共 0 个任务</span>
+                </div>
             </div>
             <div id="tasksList" class="tasks-list">
                 <!-- 任务项将通过JavaScript动态添加 -->
@@ -149,8 +167,34 @@
                 <label for="editTitle">任务标题:</label>
                 <input type="text" id="editTitle" class="form-control">
             </div>
-            <button id="saveEditBtn" class="btn btn-primary">💾 保存</button>
-            <button id="cancelEditBtn" class="btn btn-secondary">❌ 取消</button>
+            <div class="modal-actions">
+                <button id="saveEditBtn" class="btn btn-primary">💾 保存</button>
+                <button id="cancelEditBtn" class="btn btn-secondary">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量转换进度模态框 -->
+    <div id="batchConvertModal" class="modal batch-convert-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>🔄 批量转换进度</h3>
+            <div class="convert-summary">
+                <p>正在串行转换选中的任务，请耐心等待...</p>
+                <div class="progress-summary">
+                    <span>总进度: </span>
+                    <span id="convertOverallProgress">0/0</span>
+                    <span> | 当前: </span>
+                    <span id="convertCurrentTask">等待开始...</span>
+                </div>
+            </div>
+            <div id="convertProgressList" class="convert-progress-list">
+                <!-- 转换进度项将通过JavaScript动态添加 -->
+            </div>
+            <div class="modal-actions">
+                <button id="stopBatchConvertBtn" class="btn btn-warning">⏹️ 停止转换</button>
+                <button id="closeBatchConvertBtn" class="btn btn-secondary" disabled>❌ 关闭</button>
+            </div>
         </div>
     </div>
 

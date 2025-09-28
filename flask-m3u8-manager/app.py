@@ -22,7 +22,7 @@ import m3u8
 
 # 导入配置和数据库模型
 from config import config
-from models import db, DownloadRecord, DownloadStatistics
+from models import db, DownloadRecord, DownloadStatistics, Config
 from m3u8_processor import M3U8Processor
 
 app = Flask(__name__)
@@ -49,13 +49,13 @@ os.makedirs(CONVERTED_DIR, exist_ok=True)
 task_lock = threading.Lock()
 settings_lock = threading.Lock()
 
-# 运行时设置（可通过API修改）
-runtime_settings = app_config.USER_CONFIGURABLE.copy()
+# 运行时设置（从数据库加载，可通过API修改）
+runtime_settings = {}
 
 # 任务队列管理
 task_queue = []
 active_tasks = {}  # 存储活跃的任务线程和停止事件
-max_concurrent_tasks = runtime_settings['max_concurrent_tasks']
+max_concurrent_tasks = 2  # 默认值，将在load_runtime_settings中更新
 
 # 任务线程管理
 class TaskThread:
@@ -77,6 +77,41 @@ class TaskThread:
     def is_stopped(self):
         """检查是否已停止"""
         return self.stop_event.is_set()
+
+
+def load_runtime_settings():
+    """从数据库加载运行时设置"""
+    global runtime_settings, max_concurrent_tasks
+
+    try:
+        # 获取数据库中的所有配置
+        db_configs = Config.get_all_configs()
+
+        # 合并默认配置和数据库配置
+        runtime_settings = app_config.USER_CONFIGURABLE.copy()
+        runtime_settings.update(db_configs)
+
+        # 更新全局变量
+        max_concurrent_tasks = runtime_settings.get('max_concurrent_tasks', app_config.DEFAULT_MAX_CONCURRENT_TASKS)
+
+        print(f"✅ 已加载配置: {runtime_settings}")
+
+    except Exception as e:
+        print(f"⚠️ 加载配置失败，使用默认配置: {e}")
+        runtime_settings = app_config.USER_CONFIGURABLE.copy()
+        max_concurrent_tasks = runtime_settings['max_concurrent_tasks']
+
+
+def save_runtime_setting(key, value, value_type='str', description=''):
+    """保存单个运行时设置到数据库"""
+    try:
+        Config.set_value(key, value, value_type, description)
+        runtime_settings[key] = value
+        print(f"✅ 已保存配置 {key}: {value}")
+        return True
+    except Exception as e:
+        print(f"❌ 保存配置失败 {key}: {e}")
+        return False
 
 def download_segment(url, filepath, headers=None, timeout=None):
     """下载单个切片"""
@@ -414,46 +449,46 @@ def update_settings():
         if 'thread_count' in data:
             thread_count = int(data['thread_count'])
             if app_config.MIN_THREAD_COUNT <= thread_count <= app_config.MAX_THREAD_COUNT:
-                runtime_settings['thread_count'] = thread_count
-                updated['thread_count'] = thread_count
+                if save_runtime_setting('thread_count', thread_count, 'int', '默认线程数'):
+                    updated['thread_count'] = thread_count
 
         # 更新最大并发任务数
         if 'max_concurrent_tasks' in data:
             concurrent_tasks = int(data['max_concurrent_tasks'])
             if app_config.MIN_CONCURRENT_TASKS <= concurrent_tasks <= app_config.MAX_CONCURRENT_TASKS:
-                max_concurrent_tasks = concurrent_tasks
-                runtime_settings['max_concurrent_tasks'] = concurrent_tasks
-                updated['max_concurrent_tasks'] = concurrent_tasks
-                # 处理队列中的任务
-                process_task_queue()
+                if save_runtime_setting('max_concurrent_tasks', concurrent_tasks, 'int', '最大并发任务数'):
+                    max_concurrent_tasks = concurrent_tasks
+                    updated['max_concurrent_tasks'] = concurrent_tasks
+                    # 处理队列中的任务
+                    process_task_queue()
 
         # 更新下载超时时间
         if 'download_timeout' in data:
             timeout = int(data['download_timeout'])
             if 5 <= timeout <= 300:  # 5秒到5分钟
-                runtime_settings['download_timeout'] = timeout
-                updated['download_timeout'] = timeout
+                if save_runtime_setting('download_timeout', timeout, 'int', '下载超时时间(秒)'):
+                    updated['download_timeout'] = timeout
 
         # 更新最大重试次数
         if 'max_retry_count' in data:
             retry_count = int(data['max_retry_count'])
             if 0 <= retry_count <= 10:
-                runtime_settings['max_retry_count'] = retry_count
-                updated['max_retry_count'] = retry_count
+                if save_runtime_setting('max_retry_count', retry_count, 'int', '最大重试次数'):
+                    updated['max_retry_count'] = retry_count
 
         # 更新FFmpeg线程数
         if 'ffmpeg_threads' in data:
             ffmpeg_threads = int(data['ffmpeg_threads'])
             if 1 <= ffmpeg_threads <= 16:
-                runtime_settings['ffmpeg_threads'] = ffmpeg_threads
-                updated['ffmpeg_threads'] = ffmpeg_threads
+                if save_runtime_setting('ffmpeg_threads', ffmpeg_threads, 'int', 'FFmpeg转换线程数'):
+                    updated['ffmpeg_threads'] = ffmpeg_threads
 
         # 更新自动清理天数
         if 'auto_cleanup_days' in data:
             cleanup_days = int(data['auto_cleanup_days'])
             if 1 <= cleanup_days <= 30:
-                runtime_settings['auto_cleanup_days'] = cleanup_days
-                updated['auto_cleanup_days'] = cleanup_days
+                if save_runtime_setting('auto_cleanup_days', cleanup_days, 'int', '自动清理天数'):
+                    updated['auto_cleanup_days'] = cleanup_days
 
     if updated:
         return jsonify({'message': '设置更新成功', 'updated': updated})
@@ -466,10 +501,36 @@ def reset_settings():
     global max_concurrent_tasks
 
     with settings_lock:
-        runtime_settings.update(app_config.USER_CONFIGURABLE.copy())
-        max_concurrent_tasks = runtime_settings['max_concurrent_tasks']
+        try:
+            # 重置所有配置到默认值
+            default_configs = app_config.USER_CONFIGURABLE
+            for key, value in default_configs.items():
+                # 确定值类型
+                value_type = 'int' if isinstance(value, int) else 'float' if isinstance(value, float) else 'bool' if isinstance(value, bool) else 'str'
+                save_runtime_setting(key, value, value_type)
 
-    return jsonify({'message': '设置已重置为默认值'})
+            # 更新全局变量
+            max_concurrent_tasks = runtime_settings['max_concurrent_tasks']
+
+            return jsonify({'message': '设置已重置为默认值'})
+        except Exception as e:
+            return jsonify({'error': f'重置设置失败: {str(e)}'}), 500
+
+@app.route('/api/settings/all', methods=['GET'])
+def get_all_settings():
+    """获取所有配置项（包括数据库中的配置）"""
+    try:
+        with app.app_context():
+            configs = Config.query.all()
+            config_list = [config.to_dict() for config in configs]
+
+            return jsonify({
+                'configs': config_list,
+                'runtime_settings': runtime_settings,
+                'total_count': len(config_list)
+            })
+    except Exception as e:
+        return jsonify({'error': f'获取配置失败: {str(e)}'}), 500
 
 @app.route('/api/queue/status', methods=['GET'])
 def get_queue_status():
@@ -682,6 +743,16 @@ def init_database():
             migrate_database()
         except Exception as e:
             print(f"数据库迁移失败: {e}")
+
+        # 初始化默认配置
+        try:
+            Config.init_default_configs()
+            print("默认配置初始化完成")
+        except Exception as e:
+            print(f"配置初始化失败: {e}")
+
+        # 加载运行时设置
+        load_runtime_settings()
 
         # 恢复未完成的任务
         restore_active_tasks()

@@ -169,6 +169,109 @@ class DownloadRecord(db.Model):
         db.session.commit()
         return len(old_records)
 
+
+class Config(db.Model):
+    """配置表模型 - 用于持久化用户设置"""
+    __tablename__ = 'config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text, nullable=False)
+    value_type = db.Column(db.String(20), default='str')  # str, int, float, bool, json
+    description = db.Column(db.String(255), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __init__(self, key, value, value_type='str', description=''):
+        self.key = key
+        self.value = str(value)
+        self.value_type = value_type
+        self.description = description
+
+    def get_typed_value(self):
+        """根据类型返回正确的值"""
+        if self.value_type == 'int':
+            return int(self.value)
+        elif self.value_type == 'float':
+            return float(self.value)
+        elif self.value_type == 'bool':
+            return self.value.lower() in ('true', '1', 'yes', 'on')
+        elif self.value_type == 'json':
+            import json
+            return json.loads(self.value)
+        else:
+            return self.value
+
+    def set_typed_value(self, value):
+        """根据类型设置值"""
+        if self.value_type == 'json':
+            import json
+            self.value = json.dumps(value)
+        else:
+            self.value = str(value)
+        self.updated_at = datetime.utcnow()
+
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'key': self.key,
+            'value': self.get_typed_value(),
+            'value_type': self.value_type,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @staticmethod
+    def get_value(key, default=None):
+        """获取配置值"""
+        config_item = Config.query.filter_by(key=key).first()
+        if config_item:
+            return config_item.get_typed_value()
+        return default
+
+    @staticmethod
+    def set_value(key, value, value_type='str', description=''):
+        """设置配置值"""
+        config_item = Config.query.filter_by(key=key).first()
+        if config_item:
+            config_item.set_typed_value(value)
+        else:
+            config_item = Config(key=key, value=value, value_type=value_type, description=description)
+            db.session.add(config_item)
+
+        db.session.commit()
+        return config_item
+
+    @staticmethod
+    def get_all_configs():
+        """获取所有配置"""
+        configs = Config.query.all()
+        return {config.key: config.get_typed_value() for config in configs}
+
+    @staticmethod
+    def init_default_configs():
+        """初始化默认配置"""
+        from config import Config as AppConfig
+
+        default_configs = [
+            ('thread_count', AppConfig.DEFAULT_THREAD_COUNT, 'int', '默认线程数'),
+            ('max_concurrent_tasks', AppConfig.DEFAULT_MAX_CONCURRENT_TASKS, 'int', '最大并发任务数'),
+            ('download_timeout', AppConfig.DOWNLOAD_TIMEOUT, 'int', '下载超时时间(秒)'),
+            ('max_retry_count', AppConfig.MAX_RETRY_COUNT, 'int', '最大重试次数'),
+            ('ffmpeg_threads', AppConfig.FFMPEG_THREADS, 'int', 'FFmpeg转换线程数'),
+            ('auto_cleanup_days', AppConfig.AUTO_CLEANUP_DAYS, 'int', '自动清理天数'),
+        ]
+
+        for key, value, value_type, description in default_configs:
+            existing = Config.query.filter_by(key=key).first()
+            if not existing:
+                config_item = Config(key=key, value=value, value_type=value_type, description=description)
+                db.session.add(config_item)
+
+        db.session.commit()
+
 class DownloadStatistics(db.Model):
     """下载统计模型"""
     __tablename__ = 'download_statistics'
