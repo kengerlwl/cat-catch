@@ -34,13 +34,15 @@ class DownloadRecord(db.Model):
     is_converted = db.Column(db.Boolean, default=False)  # 是否已转换为MP4
     converted_at = db.Column(db.DateTime, nullable=True)  # 转换完成时间
     source_url = db.Column(db.Text, default='')  # 原始播放网页URL
+    request_headers = db.Column(db.Text, default='')  # 自定义请求头，JSON格式存储
 
-    def __init__(self, task_id, url, title="", custom_dir="", thread_count=6):
+    def __init__(self, task_id, url, title="", custom_dir="", thread_count=6, request_headers=""):
         self.task_id = task_id
         self.url = url
         self.title = title or f"task_{task_id[:8]}"
         self.custom_dir = custom_dir
         self.thread_count = thread_count
+        self.request_headers = request_headers or ""
         self.status = "pending"
         self.progress = 0
         self.total_segments = 0
@@ -73,7 +75,8 @@ class DownloadRecord(db.Model):
             'download_speed': self.download_speed,
             'is_converted': self.is_converted,
             'converted_at': self.converted_at.isoformat() if self.converted_at else None,
-            'source_url': self.source_url
+            'source_url': self.source_url,
+            'request_headers': self.request_headers
         }
 
     def update_progress(self, downloaded_segments, total_segments=None):

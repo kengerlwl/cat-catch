@@ -121,6 +121,19 @@
                     <input type="text" id="customDir" placeholder="可选，自定义下载目录" class="form-control">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group flex-grow">
+                    <label for="sourceUrl">来源页面URL:</label>
+                    <input type="url" id="sourceUrl" placeholder="可选，原始播放页面URL" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group flex-grow">
+                    <label for="requestHeaders">自定义请求头 (JSON格式):</label>
+                    <textarea id="requestHeaders" placeholder="可选，例如: {\"Referer\": \"https://example.com\", \"User-Agent\": \"Mozilla/5.0...\"}" class="form-control" rows="3"></textarea>
+                    <small>支持设置Referer、User-Agent等请求头，用于绕过防盗链</small>
+                </div>
+            </div>
             <button id="addTaskBtn" class="btn btn-primary">🚀 添加任务</button>
         </section>
 

@@ -257,7 +257,19 @@ def download_m3u8_task(task_thread):
             db.session.commit()
 
             # 使用新的M3U8处理器
+            # 从数据库获取自定义headers，如果存在则使用，否则使用默认headers
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            
+            # 如果数据库中有自定义headers，则解析并使用
+            if record.request_headers:
+                try:
+                    custom_headers = json.loads(record.request_headers)
+                    if isinstance(custom_headers, dict):
+                        headers.update(custom_headers)
+                        print(f"使用自定义headers: {custom_headers}")
+                except json.JSONDecodeError:
+                    print(f"自定义headers格式错误: {record.request_headers}")
+            
             processor = M3U8Processor(record.url, headers)
 
             # 解析M3U8
@@ -366,6 +378,7 @@ def create_task():
     custom_dir = data.get('custom_dir', '').strip()
     thread_count = data.get('thread_count', runtime_settings['thread_count'])
     source_url = data.get('source_url', '').strip()
+    request_headers = data.get('request_headers', '').strip()
 
     print("=" * 60)
 
@@ -396,7 +409,7 @@ def create_task():
 
     try:
         # 创建数据库记录
-        record = DownloadRecord(task_id, url, title, custom_dir, thread_count)
+        record = DownloadRecord(task_id, url, title, custom_dir, thread_count, request_headers)
         record.source_url = source_url
 
         # 检查是否可以立即开始下载

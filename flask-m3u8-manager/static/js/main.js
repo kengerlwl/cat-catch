@@ -92,6 +92,8 @@ class M3U8Manager {
         const title = $('#taskTitle').val().trim();
         const customDir = $('#customDir').val().trim();
         const threadCount = parseInt($('#taskThreadCount').val()) || 6;
+        const sourceUrl = $('#sourceUrl').val().trim();
+        const requestHeaders = $('#requestHeaders').val().trim();
 
         if (!url) {
             this.showNotification('请输入M3U8链接', 'error');
@@ -115,7 +117,9 @@ class M3U8Manager {
                     url: url,
                     title: title,
                     custom_dir: customDir,
-                    thread_count: threadCount
+                    thread_count: threadCount,
+                    source_url: sourceUrl,
+                    request_headers: requestHeaders
                 })
             });
 
@@ -511,6 +515,8 @@ class M3U8Manager {
         $('#m3u8Url').val('');
         $('#taskTitle').val('');
         $('#customDir').val('');
+        $('#sourceUrl').val('');
+        $('#requestHeaders').val('');
     }
 
     // 设置管理方法

@@ -35,7 +35,42 @@ except ImportError:
 class M3U8Processor:
     def __init__(self, m3u8_url, headers=None):
         self.m3u8_url = m3u8_url
-        self.headers = headers or {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        # 默认header配置，模拟浏览器行为
+        default_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'DNT': '1'
+        }
+        
+        # 从M3U8 URL解析host并设置默认的Referer和Origin
+        try:
+            from urllib.parse import urlparse
+            parsed_url = urlparse(m3u8_url)
+            if parsed_url.scheme and parsed_url.netloc:
+                # 构建基础URL（协议+域名+端口）
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                # 只有在没有提供或headers中不包含这些属性时才设置默认值
+                if not headers or 'Referer' not in headers:
+                    default_headers['Referer'] = base_url
+                if not headers or 'Origin' not in headers:
+                    default_headers['Origin'] = base_url
+                print(f"自动设置Referer和Origin为: {base_url}")
+        except Exception as e:
+            print(f"解析M3U8 URL失败，无法设置默认Referer和Origin: {e}")
+        
+        # 如果提供了自定义headers，则合并到默认headers中
+        if headers:
+            default_headers.update(headers)
+        
+        self.headers = default_headers
         self.m3u8_obj = None
         self.segments = []
         self.keys = {}  # 存储解密密钥
