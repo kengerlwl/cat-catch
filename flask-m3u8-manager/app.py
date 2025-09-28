@@ -270,7 +270,7 @@ def download_m3u8_task(task_thread):
                 except json.JSONDecodeError:
                     print(f"自定义headers格式错误: {record.request_headers}")
             
-            processor = M3U8Processor(record.url, headers)
+            processor = M3U8Processor(record.url, headers, record.source_url)
 
             # 解析M3U8
             if not processor.parse_m3u8():
@@ -292,12 +292,16 @@ def download_m3u8_task(task_thread):
                 db.session.commit()
                 # print(f"进度更新: {downloaded}/{total} ({record.progress}%)")
 
+            # 检查是否是恢复模式（从失败状态恢复）
+            resume_mode = record.status == "failed"
+            
             # 下载所有切片（包含解密处理）- 使用配置的线程数进行并发下载
             success = processor.download_all_segments(
                 task_dir,
                 max_retries=runtime_settings['max_retry_count'],
                 progress_callback=update_progress,
-                max_workers=record.thread_count  # 使用任务配置的线程数
+                max_workers=record.thread_count,  # 使用任务配置的线程数
+                resume_mode=resume_mode  # 如果是恢复模式，启用断点续传
             )
 
             if success:
@@ -477,7 +481,7 @@ def resume_task(task_id):
         if not record:
             return jsonify({'error': '任务不存在'}), 404
 
-        if record.status == "paused":
+        if record.status in ["paused", "failed"]:
             # 检查是否可以立即开始下载
             if len(active_tasks) < max_concurrent_tasks:
                 record.status = "pending"

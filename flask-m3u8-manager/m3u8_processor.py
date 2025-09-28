@@ -33,7 +33,7 @@ except ImportError:
         unpad = None
 
 class M3U8Processor:
-    def __init__(self, m3u8_url, headers=None):
+    def __init__(self, m3u8_url, headers=None, source_url=None):
         self.m3u8_url = m3u8_url
         # 默认header配置，模拟浏览器行为
         default_headers = {
@@ -50,26 +50,27 @@ class M3U8Processor:
             'DNT': '1'
         }
         
-        # 从M3U8 URL解析host并设置默认的Referer和Origin
-        try:
-            from urllib.parse import urlparse
-            parsed_url = urlparse(m3u8_url)
-            if parsed_url.scheme and parsed_url.netloc:
-                # 构建基础URL（协议+域名+端口）
-                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-                # 只有在没有提供或headers中不包含这些属性时才设置默认值
-                if not headers or 'Referer' not in headers:
-                    default_headers['Referer'] = base_url
-                if not headers or 'Origin' not in headers:
-                    default_headers['Origin'] = base_url
-                print(f"自动设置Referer和Origin为: {base_url}")
-        except Exception as e:
-            print(f"解析M3U8 URL失败，无法设置默认Referer和Origin: {e}")
+        # 从source_url解析host并设置默认的Referer和Origin
+        if source_url:
+            try:
+                from urllib.parse import urlparse
+                parsed_url = urlparse(source_url)
+                if parsed_url.scheme and parsed_url.netloc:
+                    # 构建基础URL（协议+域名+端口）
+                    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    # 只有在没有提供或headers中不包含这些属性时才设置默认值
+                    if not headers or 'Referer' not in headers:
+                        default_headers['Referer'] = base_url
+                    if not headers or 'Origin' not in headers:
+                        default_headers['Origin'] = base_url
+                    print(f"从来源页面URL自动设置Referer和Origin为: {base_url}")
+            except Exception as e:
+                print(f"解析来源页面URL失败，无法设置默认Referer和Origin: {e}")
         
         # 如果提供了自定义headers，则合并到默认headers中
         if headers:
             default_headers.update(headers)
-        
+        print(f"最终headers: {default_headers}")
         self.headers = default_headers
         self.m3u8_obj = None
         self.segments = []
@@ -227,8 +228,8 @@ class M3U8Processor:
         # 但有些文件可能有其他格式，所以这里只是警告
         return data[0] == 0x47
 
-    def download_all_segments(self, output_dir, max_retries=3, progress_callback=None, max_workers=6):
-        """下载所有切片 - 支持多线程并发下载"""
+    def download_all_segments(self, output_dir, max_retries=3, progress_callback=None, max_workers=6, resume_mode=False):
+        """下载所有切片 - 支持多线程并发下载和断点续传"""
         if not self.segments:
             print("没有可下载的切片")
             return False
@@ -239,26 +240,41 @@ class M3U8Processor:
 
         # 准备下载任务列表
         download_tasks = []
+        failed_segments = []
+        
         for segment_info in self.segments:
             filename = f"segment_{segment_info['index']:06d}.ts"
             output_path = os.path.join(output_dir, filename)
 
-            # 跳过已存在的文件
+            # 检查文件是否存在
             if os.path.exists(output_path):
-                print(f"切片 {segment_info['index']} 已存在，跳过")
-                with self._lock:
-                    success_count += 1
-                    if progress_callback:
-                        progress_callback(success_count, total_segments)
-                continue
+                # 检查文件是否有效（大小大于0）
+                file_size = os.path.getsize(output_path)
+                if file_size > 0:
+                    print(f"切片 {segment_info['index']} 已存在且有效，跳过")
+                    with self._lock:
+                        success_count += 1
+                        if progress_callback:
+                            progress_callback(success_count, total_segments)
+                    continue
+                else:
+                    print(f"切片 {segment_info['index']} 文件大小为0，需要重新下载")
+                    os.remove(output_path)  # 删除无效文件
 
+            # 在恢复模式下，记录失败的切片
+            if resume_mode:
+                failed_segments.append(segment_info['index'])
+            
             download_tasks.append((segment_info, output_path, max_retries))
 
         if not download_tasks:
             print("所有切片已存在，无需下载")
             return True
 
-        print(f"开始并发下载 {len(download_tasks)} 个切片，使用 {max_workers} 个线程")
+        if resume_mode and failed_segments:
+            print(f"恢复模式：需要重新下载 {len(failed_segments)} 个失败的切片: {failed_segments}")
+        else:
+            print(f"开始下载 {len(download_tasks)} 个切片，使用 {max_workers} 个线程")
 
         # 使用线程池并发下载
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
