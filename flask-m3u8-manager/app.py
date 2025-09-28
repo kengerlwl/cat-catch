@@ -58,6 +58,31 @@ task_queue = []
 active_tasks = {}  # 存储活跃的任务线程和停止事件
 max_concurrent_tasks = 2  # 默认值，将在load_runtime_settings中更新
 
+def check_database_ready():
+    """检查数据库是否已准备就绪"""
+    try:
+        # 简单检查：数据库文件是否存在且不为空
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+            return False
+
+        # 检查关键表是否存在
+        with app.app_context():
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            required_tables = ['download_records', 'config', 'prompts', 'download_statistics']
+
+            for table in required_tables:
+                if table not in tables:
+                    print(f"缺少表: {table}")
+                    return False
+
+            return True
+    except Exception as e:
+        print(f"数据库就绪检查失败: {e}")
+        return False
+
 # 任务线程管理
 class TaskThread:
     """任务线程管理类"""
@@ -135,48 +160,6 @@ def get_ai_optimized_title(original_title):
         return original_title
 
 
-def ensure_movie_name_extractor_prompt():
-    """
-    确保movie_name_extractor prompt存在于数据库中
-    """
-    try:
-        existing = Prompts.query.filter_by(key='movie_name_extractor').first()
-        if existing:
-            return True
-
-        # 创建默认的movie_name_extractor prompt
-        prompt_value = """你是一个电影名字的归纳员。我正在从网络上下载电影，但是电影名字可以夹带了一些网页的信息，请你从中抽取去电影真正的名字。
-
-例如：
-
-输入：《尖叫之地》全集在线观看 - 电影 - 努努影院
-
-电影名：尖叫之地
-
-注意：
-
-1. 电影名可能含有编号，以及演员名字，这也需要保留
-
-2. 请你直接只输出电影，不要输出其他任何信息
-
-输入：
-
-{input}
-
-电影名："""
-
-        Prompts.set_prompt(
-            key='movie_name_extractor',
-            value=prompt_value,
-            description='根据输入的混杂信息，抽取并只输出电影的真实名称，保留编号及演员名。'
-        )
-
-        print("✅ 成功创建movie_name_extractor prompt")
-        return True
-
-    except Exception as e:
-        print(f"❌ 创建movie_name_extractor prompt失败: {str(e)}")
-        return False
 
 
 def load_runtime_settings():
@@ -352,10 +335,14 @@ def llm_config_page():
 def get_tasks():
     """获取所有下载任务"""
     try:
+        if not check_database_ready():
+            # 数据库表还未创建，返回空列表
+            return jsonify({'tasks': [], 'database_initializing': True})
+
         # 从数据库获取所有任务
         tasks = DownloadRecord.query.order_by(DownloadRecord.created_at.desc()).all()
         tasks_data = [task.to_dict() for task in tasks]
-        return jsonify({'tasks': tasks_data})
+        return jsonify({'tasks': tasks_data, 'database_initializing': False})
     except Exception as e:
         return jsonify({'error': f'获取任务列表失败: {str(e)}'}), 500
 
@@ -646,6 +633,15 @@ def reset_settings():
 def get_all_settings():
     """获取所有配置项（包括数据库中的配置）"""
     try:
+        if not check_database_ready():
+            # 数据库表还未创建，返回默认配置
+            return jsonify({
+                'configs': [],
+                'runtime_settings': runtime_settings,
+                'total_count': 0,
+                'database_initializing': True
+            })
+
         with app.app_context():
             configs = Config.query.all()
             config_list = [config.to_dict() for config in configs]
@@ -653,7 +649,8 @@ def get_all_settings():
             return jsonify({
                 'configs': config_list,
                 'runtime_settings': runtime_settings,
-                'total_count': len(config_list)
+                'total_count': len(config_list),
+                'database_initializing': False
             })
     except Exception as e:
         return jsonify({'error': f'获取配置失败: {str(e)}'}), 500
@@ -662,6 +659,18 @@ def get_all_settings():
 def get_queue_status():
     """获取队列状态"""
     try:
+        if not check_database_ready():
+            # 数据库表还未创建，返回默认状态
+            return jsonify({
+                'active_tasks': 0,
+                'queued_tasks': 0,
+                'max_concurrent_tasks': max_concurrent_tasks,
+                'total_tasks': 0,
+                'active_task_ids': [],
+                'queued_task_ids': [],
+                'database_initializing': True
+            })
+
         total_tasks = DownloadRecord.query.count()
         return jsonify({
             'active_tasks': len(active_tasks),
@@ -669,7 +678,8 @@ def get_queue_status():
             'max_concurrent_tasks': max_concurrent_tasks,
             'total_tasks': total_tasks,
             'active_task_ids': list(active_tasks.keys()),
-            'queued_task_ids': task_queue
+            'queued_task_ids': task_queue,
+            'database_initializing': False
         })
     except Exception as e:
         return jsonify({'error': f'获取队列状态失败: {str(e)}'}), 500
@@ -857,25 +867,33 @@ def download_file(task_id):
 
 # 数据库初始化和应用启动前的操作
 def init_database():
-    """初始化数据库"""
+    """初始化数据库 - 重构后的简化版本"""
     with app.app_context():
-        # 创建所有表
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+
+        # 检查数据库文件是否存在
+        is_new_database = not os.path.exists(db_path) or os.path.getsize(db_path) == 0
+
+        if is_new_database:
+            print("🆕 检测到新环境，正在创建数据库...")
+            # 如果是空文件，先删除
+            if os.path.exists(db_path):
+                os.remove(db_path)
+        else:
+            print("📂 数据库文件已存在")
+
+        # 创建所有表（如果不存在）
+        print("📋 创建数据库表...")
         db.create_all()
-        print("数据库初始化完成")
 
-        # 执行数据库迁移
-        try:
-            from migrate_db import migrate_database
-            migrate_database()
-        except Exception as e:
-            print(f"数据库迁移失败: {e}")
+        # 验证表创建
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        print(f"✅ 数据库表: {tables}")
 
-        # 初始化默认配置
-        try:
-            Config.init_default_configs()
-            print("默认配置初始化完成")
-        except Exception as e:
-            print(f"配置初始化失败: {e}")
+        # 初始化默认数据（仅在新数据库或缺少默认数据时）
+        _init_default_data()
 
         # 加载运行时设置
         load_runtime_settings()
@@ -883,19 +901,128 @@ def init_database():
         # 初始化LLM服务
         try:
             init_llm_service_from_db()
-            print("LLM服务初始化完成")
+            print("✅ LLM服务初始化完成")
         except Exception as e:
-            print(f"LLM服务初始化失败: {e}")
+            print(f"❌ LLM服务初始化失败: {e}")
 
-        # 确保movie_name_extractor prompt存在
-        try:
-            ensure_movie_name_extractor_prompt()
-            print("AI命名功能prompt检查完成")
-        except Exception as e:
-            print(f"AI命名功能prompt检查失败: {e}")
+        # 恢复未完成的任务（仅现有数据库）
+        if not is_new_database:
+            try:
+                restore_active_tasks()
+                print("✅ 任务恢复完成")
+            except Exception as e:
+                print(f"❌ 任务恢复失败: {e}")
 
-        # 恢复未完成的任务
-        restore_active_tasks()
+        print("🎯 数据库初始化完成")
+
+
+def _init_default_data():
+    """初始化默认数据"""
+    print("🔧 检查并初始化默认数据...")
+
+    # 初始化Config表的默认配置
+    try:
+        _ensure_default_configs()
+        print("✅ 默认配置检查完成")
+    except Exception as e:
+        print(f"❌ 配置初始化失败: {e}")
+
+    # 初始化LLM配置
+    try:
+        _ensure_default_llm_config()
+        print("✅ LLM配置检查完成")
+    except Exception as e:
+        print(f"❌ LLM配置初始化失败: {e}")
+
+    # 初始化Prompts表的默认数据
+    try:
+        _ensure_default_prompts()
+        print("✅ 默认Prompt检查完成")
+    except Exception as e:
+        print(f"❌ Prompt初始化失败: {e}")
+
+
+def _ensure_default_configs():
+    """确保默认配置存在"""
+    from config import Config as AppConfig
+
+    default_configs = [
+        ('thread_count', AppConfig.DEFAULT_THREAD_COUNT, 'int', '默认线程数'),
+        ('max_concurrent_tasks', AppConfig.DEFAULT_MAX_CONCURRENT_TASKS, 'int', '最大并发任务数'),
+        ('download_timeout', AppConfig.DOWNLOAD_TIMEOUT, 'int', '下载超时时间(秒)'),
+        ('max_retry_count', AppConfig.MAX_RETRY_COUNT, 'int', '最大重试次数'),
+        ('ffmpeg_threads', AppConfig.FFMPEG_THREADS, 'int', 'FFmpeg转换线程数'),
+        ('auto_cleanup_days', AppConfig.AUTO_CLEANUP_DAYS, 'int', '自动清理天数'),
+        ('enable_ai_naming', False, 'bool', '启用AI智能命名功能'),
+    ]
+
+    for key, value, value_type, description in default_configs:
+        existing = Config.query.filter_by(key=key).first()
+        if not existing:
+            config_item = Config(key=key, value=value, value_type=value_type, description=description)
+            db.session.add(config_item)
+
+    db.session.commit()
+
+
+def _ensure_default_llm_config():
+    """确保默认LLM配置存在"""
+    # 检查是否已存在LLM配置
+    existing_config = Config.query.filter_by(key='llm_api_url').first()
+    if existing_config:
+        return  # 已存在配置，不覆盖
+
+    # 设置默认LLM配置
+    llm_configs = [
+        ('llm_api_url', 'https://globalai.vip/v1/chat/completions', 'str', 'LLM API接口地址'),
+        ('llm_api_key', 'sk-rEh0PI8OkwAyOQbRX9xO7AwdrPPvhuin7x2FN7F96EAfI7ai', 'str', 'LLM API密钥'),
+        ('llm_default_model', 'gpt-4.1', 'str', 'LLM默认模型'),
+        ('llm_default_max_tokens', 4096, 'int', 'LLM默认最大token数'),
+        ('llm_timeout', 30, 'int', 'LLM请求超时时间（秒）'),
+    ]
+
+    for key, value, value_type, description in llm_configs:
+        config_item = Config(key=key, value=value, value_type=value_type, description=description)
+        db.session.add(config_item)
+
+    db.session.commit()
+
+
+def _ensure_default_prompts():
+    """确保默认Prompt存在"""
+    # 检查movie_name_extractor prompt是否存在
+    existing = Prompts.query.filter_by(key='movie_name_extractor').first()
+    if existing:
+        return  # 已存在，不覆盖
+
+    # 创建默认的movie_name_extractor prompt
+    prompt_value = """你是一个电影名字的归纳员。我正在从网络上下载电影，但是电影名字可以夹带了一些网页的信息，请你从中抽取去电影真正的名字。
+
+例如：
+
+输入：《尖叫之地》全集在线观看 - 电影 - 努努影院
+
+电影名：尖叫之地
+
+注意：
+
+1. 电影名可能含有编号，以及演员名字，这也需要保留
+
+2. 请你直接只输出电影，不要输出其他任何信息
+
+输入：
+
+{input}
+
+电影名："""
+
+    prompt = Prompts(
+        key='movie_name_extractor',
+        value=prompt_value,
+        description='根据输入的混杂信息，抽取并只输出电影的真实名称，保留编号及演员名。'
+    )
+    db.session.add(prompt)
+    db.session.commit()
 
 def restore_active_tasks():
     """恢复应用重启前的活跃任务"""
@@ -927,6 +1054,25 @@ def restore_active_tasks():
 def get_statistics():
     """获取下载统计信息"""
     try:
+        if not check_database_ready():
+            # 数据库表还未创建，返回默认统计
+            return jsonify({
+                'total_tasks': 0,
+                'completed_tasks': 0,
+                'failed_tasks': 0,
+                'active_tasks': 0,
+                'success_rate': 0,
+                'today_stats': {
+                    'date': datetime.utcnow().date().isoformat(),
+                    'total_downloads': 0,
+                    'completed_downloads': 0,
+                    'failed_downloads': 0,
+                    'total_size': 0
+                },
+                'recent_stats': [],
+                'database_initializing': True
+            })
+
         # 更新今日统计
         DownloadStatistics.update_daily_stats()
 
@@ -955,7 +1101,8 @@ def get_statistics():
             'active_tasks': active_tasks_count,
             'success_rate': round((completed_tasks / total_tasks * 100), 2) if total_tasks > 0 else 0,
             'today_stats': today_stats.to_dict(),
-            'recent_stats': [stat.to_dict() for stat in recent_stats]
+            'recent_stats': [stat.to_dict() for stat in recent_stats],
+            'database_initializing': False
         })
     except Exception as e:
         return jsonify({'error': f'获取统计信息失败: {str(e)}'}), 500
@@ -1192,11 +1339,62 @@ def test_llm_connection():
             'success': True,
             'message': 'LLM连接测试成功'
         })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'LLM连接测试失败: {str(e)}'
+        }), 500
+
+@app.route('/api/database/init', methods=['POST'])
+def manual_init_database():
+    """手动初始化数据库"""
+    try:
+        print("收到手动初始化数据库请求")
+        init_database()
+
+        if check_database_ready():
+            return jsonify({
+                'success': True,
+                'message': '数据库初始化成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '数据库初始化失败，请检查日志'
+            }), 500
 
     except Exception as e:
         return jsonify({
             'success': False,
-            'error': f'LLM连接测试失败: {str(e)}'
+            'message': f'数据库初始化失败: {str(e)}'
+        }), 500
+
+@app.route('/api/database/status', methods=['GET'])
+def get_database_status():
+    """获取数据库状态"""
+    try:
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+
+        status = {
+            'database_file_exists': os.path.exists(db_path),
+            'database_file_size': os.path.getsize(db_path) if os.path.exists(db_path) else 0,
+            'database_ready': check_database_ready(),
+            'database_path': db_path
+        }
+
+        if status['database_ready']:
+            with app.app_context():
+                from sqlalchemy import inspect
+                inspector = inspect(db.engine)
+                status['tables'] = inspector.get_table_names()
+        else:
+            status['tables'] = []
+
+        return jsonify(status)
+
+    except Exception as e:
+        return jsonify({
+            'error': f'获取数据库状态失败: {str(e)}'
         }), 500
 
 

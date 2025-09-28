@@ -250,28 +250,6 @@ class Config(db.Model):
         configs = Config.query.all()
         return {config.key: config.get_typed_value() for config in configs}
 
-    @staticmethod
-    def init_default_configs():
-        """初始化默认配置"""
-        from config import Config as AppConfig
-
-        default_configs = [
-            ('thread_count', AppConfig.DEFAULT_THREAD_COUNT, 'int', '默认线程数'),
-            ('max_concurrent_tasks', AppConfig.DEFAULT_MAX_CONCURRENT_TASKS, 'int', '最大并发任务数'),
-            ('download_timeout', AppConfig.DOWNLOAD_TIMEOUT, 'int', '下载超时时间(秒)'),
-            ('max_retry_count', AppConfig.MAX_RETRY_COUNT, 'int', '最大重试次数'),
-            ('ffmpeg_threads', AppConfig.FFMPEG_THREADS, 'int', 'FFmpeg转换线程数'),
-            ('auto_cleanup_days', AppConfig.AUTO_CLEANUP_DAYS, 'int', '自动清理天数'),
-            ('enable_ai_naming', False, 'bool', '启用AI智能命名功能'),
-        ]
-
-        for key, value, value_type, description in default_configs:
-            existing = Config.query.filter_by(key=key).first()
-            if not existing:
-                config_item = Config(key=key, value=value, value_type=value_type, description=description)
-                db.session.add(config_item)
-
-        db.session.commit()
 
 class DownloadStatistics(db.Model):
     """下载统计模型"""
@@ -439,22 +417,3 @@ class LLMConfig:
             Config.set_value(cls.LLM_TIMEOUT, timeout, 'int', 'LLM请求超时时间（秒）')
 
         return cls.get_llm_config()
-
-    @classmethod
-    def init_default_llm_config(cls):
-        """
-        初始化默认LLM配置
-        """
-        # 检查是否已存在配置
-        existing_config = Config.query.filter_by(key=cls.LLM_API_URL).first()
-        if existing_config:
-            return  # 已存在配置，不覆盖
-
-        # 设置默认配置
-        cls.set_llm_config(
-            api_url='https://globalai.vip/v1/chat/completions',
-            api_key='sk-rEh0PI8OkwAyOQbRX9xO7AwdrPPvhuin7x2FN7F96EAfI7ai',
-            default_model='gpt-4.1',
-            default_max_tokens=4096,
-            timeout=30
-        )

@@ -13,7 +13,7 @@ import threading
 # 添加当前目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app
+from app import app, init_database
 
 def open_browser():
     """延迟打开浏览器"""
@@ -32,6 +32,9 @@ if __name__ == '__main__':
     print("  3. 管理下载任务（暂停、恢复、转换等）")
     print("  4. 在cat-catch扩展的m3u8下载页面点击'后台下载'按钮")
     print("=" * 50)
+
+    # 初始化数据库
+    init_database()
 
     # 在新线程中打开浏览器
     browser_thread = threading.Thread(target=open_browser)

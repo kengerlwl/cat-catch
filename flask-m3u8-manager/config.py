@@ -5,6 +5,17 @@ Flask M3U8 下载管理器配置文件
 
 import os
 import platform
+import sys
+
+def get_app_data_dir():
+    """获取应用数据目录"""
+    if getattr(sys, 'frozen', False):
+        # 如果是打包后的exe
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        # 如果是开发环境
+        app_dir = os.path.dirname(__file__)
+    return app_dir
 
 class Config:
     """基础配置"""
@@ -13,7 +24,7 @@ class Config:
 
     # 数据库配置
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(os.path.dirname(__file__), 'downloads.db')
+        'sqlite:///' + os.path.join(get_app_data_dir(), 'downloads.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # 服务器配置
@@ -22,7 +33,7 @@ class Config:
     DEBUG = False
 
     # 下载配置
-    DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), 'downloads')
+    DOWNLOAD_DIR = os.path.join(get_app_data_dir(), 'downloads')
     SEGMENTS_DIR = os.path.join(DOWNLOAD_DIR, 'segments')
     CONVERTED_DIR = os.path.join(DOWNLOAD_DIR, 'converted')
 

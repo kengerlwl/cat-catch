@@ -9,3 +9,12 @@ dist/
 *.pyc
 .catpaw/rules/main.md
 .DS_Store
+
+# 数据库文件
+/flask-m3u8-manager/*.db
+/flask-m3u8-manager/*.db.backup
+/flask-m3u8-manager/user_config.json
+
+# PyInstaller
+/flask-m3u8-manager/__pycache__/
+/flask-m3u8-manager/*.spec.backup

@@ -23,6 +23,14 @@ pip3 install pyinstaller
 
 echo ""
 echo "Building executable..."
+
+# 备份并移除数据库文件（避免打包进exe）
+if [ -f "downloads.db" ]; then
+    echo "Backing up database file..."
+    cp downloads.db downloads.db.backup
+    rm downloads.db
+fi
+
 if [ -f "flask_m3u8_manager.spec" ]; then
     echo "Using existing spec file..."
     pyinstaller flask_m3u8_manager.spec --clean --noconfirm
@@ -39,6 +47,7 @@ else
         --add-data "config.py:." \
         --add-data "models.py:." \
         --add-data "m3u8_processor.py:." \
+        --add-data "llm_service.py:." \
         --add-data "app.py:." \
         --hidden-import flask \
         --hidden-import flask_cors \
@@ -56,6 +65,12 @@ else
         --hidden-import sqlalchemy
 fi
 
+# 恢复数据库文件
+if [ -f "downloads.db.backup" ]; then
+    echo "Restoring database file..."
+    mv downloads.db.backup downloads.db
+fi
+
 if [ -f "dist/Flask-M3U8-Manager" ]; then
     echo ""
     echo "========================================"
@@ -64,8 +79,11 @@ if [ -f "dist/Flask-M3U8-Manager" ]; then
     echo "Executable location: dist/Flask-M3U8-Manager"
     echo "File size: $(ls -lh dist/Flask-M3U8-Manager | awk '{print $5}')"
     echo ""
-    echo "You can now run the executable to start the Flask M3U8 Manager."
-    echo "The application will be available at http://localhost:5001"
+    echo "IMPORTANT NOTES:"
+    echo "- First run will automatically create database and initialize all tables"
+    echo "- Default configurations and LLM settings will be created automatically"
+    echo "- All settings can be modified through the web interface"
+    echo "- The application will be available at http://localhost:5001"
     echo ""
 
     # 询问是否要运行

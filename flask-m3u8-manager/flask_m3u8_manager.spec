@@ -18,6 +18,7 @@ a = Analysis(
         ('models.py', '.'),
         ('m3u8_processor.py', '.'),
         ('app.py', '.'),
+        ('llm_service.py', '.'),
     ],
     hiddenimports=[
         'flask',
@@ -83,6 +84,8 @@ a = Analysis(
         'cv2',
         'torch',
         'tensorflow',
+        'downloads.db',  # 排除本地数据库文件
+        '*.db',          # 排除所有数据库文件
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

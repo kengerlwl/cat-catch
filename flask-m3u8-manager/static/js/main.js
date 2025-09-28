@@ -142,6 +142,16 @@ class M3U8Manager {
             const data = await response.json();
 
             if (response.ok) {
+                if (data.database_initializing) {
+                    // 数据库正在初始化，显示提示并稍后重试
+                    this.tasks = [];
+                    this.renderInitializingState();
+
+                    // 3秒后重试
+                    setTimeout(() => this.loadTasks(), 3000);
+                    return;
+                }
+
                 this.tasks = data.tasks;
                 this.renderTasks();
                 this.updateTaskCount();
@@ -161,6 +171,20 @@ class M3U8Manager {
         } catch (error) {
             this.showNotification('网络错误: ' + error.message, 'error');
         }
+    }
+
+    renderInitializingState() {
+        const $tasksList = $('#tasksList');
+        $tasksList.html(`
+            <div class="empty-state">
+                <h3>🔄 系统初始化中...</h3>
+                <p>正在创建数据库和配置文件，请稍候...</p>
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+            </div>
+        `);
+        $('#taskCount').text('系统初始化中...');
     }
 
     renderTasks() {
@@ -600,11 +624,20 @@ class M3U8Manager {
             const status = await response.json();
 
             if (response.ok) {
-                $('#activeTasksCount').text(status.active_tasks);
-                $('#queuedTasksCount').text(status.queued_tasks);
+                if (status.database_initializing) {
+                    // 数据库正在初始化，显示提示信息
+                    $('#activeTasksCount').text('初始化中...');
+                    $('#queuedTasksCount').text('初始化中...');
 
-                // 更新任务计数
-                this.updateTaskCount();
+                    // 3秒后重试
+                    setTimeout(() => this.updateQueueStatus(), 3000);
+                } else {
+                    $('#activeTasksCount').text(status.active_tasks);
+                    $('#queuedTasksCount').text(status.queued_tasks);
+
+                    // 更新任务计数
+                    this.updateTaskCount();
+                }
             }
         } catch (error) {
             console.warn('更新队列状态失败:', error);
