@@ -688,19 +688,36 @@ function closeTab(tabId = 0) {
  */
 function openParser(data, options = {}) {
     chrome.tabs.get(G.tabId, function (tab) {
-        const url = `/${data.parsing ? data.parsing : "m3u8"}.html?${new URLSearchParams({
-            url: data.url,
-            title: data.title,
-            filename: data.downFileName,
-            tabid: data.tabId == -1 ? G.tabId : data.tabId,
-            initiator: data.initiator,
-            requestHeaders: data.requestHeaders ? JSON.stringify(data.requestHeaders) : undefined,
-            ...Object.fromEntries(Object.entries(options).map(([key, value]) => [key, typeof value === 'boolean' ? 1 : value])),
-        })}`
-        chrome.tabs.create({
-            url: url,
-            index: tab.index + 1,
-            active: G.isMobile || !options.autoDown
+        // 直接获取原始标签页的URL
+        chrome.tabs.get(data.tabId == -1 ? G.tabId : data.tabId, function(sourceTab) {
+            let sourcePageUrl = "";
+
+            if (chrome.runtime.lastError || !sourceTab) {
+                console.log("无法获取原始标签页信息，使用备选方案");
+                sourcePageUrl = data.webUrl || data.requestHeaders?.referer || data.initiator || "";
+            } else if (sourceTab.url && !sourceTab.url.startsWith('chrome-extension://')) {
+                sourcePageUrl = sourceTab.url;
+                console.log("从原始标签页获取完整URL:", sourcePageUrl);
+            } else {
+                console.log("原始标签页URL无效，使用备选方案");
+                sourcePageUrl = data.webUrl || data.requestHeaders?.referer || data.initiator || "";
+            }
+
+            const url = `/${data.parsing ? data.parsing : "m3u8"}.html?${new URLSearchParams({
+                url: data.url,
+                title: data.title,
+                filename: data.downFileName,
+                tabid: data.tabId == -1 ? G.tabId : data.tabId,
+                initiator: data.webUrl || data.requestHeaders?.referer || data.initiator,
+                source_page_url: sourcePageUrl, // 新增：直接传递完整的源页面URL
+                requestHeaders: data.requestHeaders ? JSON.stringify(data.requestHeaders) : undefined,
+                ...Object.fromEntries(Object.entries(options).map(([key, value]) => [key, typeof value === 'boolean' ? 1 : value])),
+            })}`
+            chrome.tabs.create({
+                url: url,
+                index: tab.index + 1,
+                active: G.isMobile || !options.autoDown
+             });
         });
     });
 }

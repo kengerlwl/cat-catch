@@ -239,7 +239,8 @@ function findMedia(data, isRegex = false, filter = false, timer = false) {
         // 装载页面信息
         info.title = webInfo?.title ?? "NULL";
         info.favIconUrl = webInfo?.favIconUrl;
-        info.webUrl = webInfo?.url;
+        // 优先使用标签页URL，然后是referer，最后是initiator
+        info.webUrl = webInfo?.url || info.requestHeaders?.referer || info.initiator;
         // 屏蔽资源
         if (!isRegex && G.blackList.has(data.requestId)) {
             G.blackList.delete(data.requestId);

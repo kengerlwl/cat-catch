@@ -278,7 +278,7 @@ def download_m3u8_task(task_thread):
             def update_progress(downloaded, total):
                 record.update_progress(downloaded, total)
                 db.session.commit()
-                print(f"进度更新: {downloaded}/{total} ({record.progress}%)")
+                # print(f"进度更新: {downloaded}/{total} ({record.progress}%)")
 
             # 下载所有切片（包含解密处理）- 使用配置的线程数进行并发下载
             success = processor.download_all_segments(
@@ -351,11 +351,23 @@ def create_task():
     """创建新的下载任务"""
     global max_concurrent_tasks
 
+    # ===== DEBUG: 打印请求信息 =====
+    print("=" * 60)
+    print("🔍 收到新的任务创建请求")
+    print(f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🌐 请求来源: {request.remote_addr}")
+    print(f"📦 原始请求体: {request.get_data(as_text=True)}")
+
     data = request.json
+    print(f"📄 解析后的JSON数据: {json.dumps(data, indent=2, ensure_ascii=False)}")
+
     url = data.get('url', '').strip()
     title = data.get('title', '').strip()
     custom_dir = data.get('custom_dir', '').strip()
     thread_count = data.get('thread_count', runtime_settings['thread_count'])
+    source_url = data.get('source_url', '').strip()
+
+    print("=" * 60)
 
     if not url:
         return jsonify({'error': '请提供M3U8链接'}), 400
@@ -385,6 +397,7 @@ def create_task():
     try:
         # 创建数据库记录
         record = DownloadRecord(task_id, url, title, custom_dir, thread_count)
+        record.source_url = source_url
 
         # 检查是否可以立即开始下载
         if len(active_tasks) < max_concurrent_tasks:
@@ -824,32 +837,6 @@ def convert_to_mp4(task_id):
     except Exception as e:
         return jsonify({'error': f'转换过程中出错: {str(e)}'}), 500
 
-@app.route('/api/tasks/<task_id>/play')
-def play_task(task_id):
-    """跳转到播放页面"""
-    try:
-        record = DownloadRecord.get_by_task_id(task_id)
-        if not record:
-            return jsonify({'error': '任务不存在'}), 404
-
-        # 返回播放页面URL
-        play_url = f"/play/{task_id}"
-        return jsonify({'play_url': play_url})
-    except Exception as e:
-        return jsonify({'error': f'获取播放链接失败: {str(e)}'}), 500
-
-@app.route('/play/<task_id>')
-def play_page(task_id):
-    """播放页面"""
-    try:
-        record = DownloadRecord.get_by_task_id(task_id)
-        if not record:
-            return "任务不存在", 404
-
-        return render_template('play.html', task=record.to_dict())
-    except Exception as e:
-        return f"播放页面加载失败: {str(e)}", 500
-
 @app.route('/api/download/<task_id>')
 def download_file(task_id):
     """下载转换后的文件"""
@@ -1048,6 +1035,18 @@ def restore_active_tasks():
 
     except Exception as e:
         print(f"恢复活跃任务失败: {e}")
+        # 如果是字段不存在的错误，尝试修复数据库结构
+        if "no such column: download_records.source_url" in str(e):
+            try:
+                print("检测到source_url字段缺失，尝试自动修复...")
+                from sqlalchemy import text
+                db.session.execute(text("ALTER TABLE download_records ADD COLUMN source_url TEXT DEFAULT ''"))
+                db.session.commit()
+                print("✅ 数据库结构已修复，请重启应用")
+            except Exception as fix_error:
+                print(f"❌ 自动修复失败: {fix_error}")
+                print("请手动执行: ALTER TABLE download_records ADD COLUMN source_url TEXT DEFAULT '';")
+        # 继续启动，不因为这个错误中断
 
 # 添加统计API
 @app.route('/api/statistics', methods=['GET'])

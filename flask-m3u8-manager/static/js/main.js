@@ -444,18 +444,12 @@ class M3U8Manager {
     }
 
     async playTask(taskId) {
-        try {
-            const response = await fetch(`/api/tasks/${taskId}/play`);
-            const data = await response.json();
-
-            if (response.ok) {
-                window.open(data.play_url, '_blank');
-            } else {
-                this.showNotification(data.error || '播放失败', 'error');
-            }
-        } catch (error) {
-            this.showNotification('网络错误: ' + error.message, 'error');
+        const task = this.tasks.find(t => t.task_id === taskId);
+        if (!task || !task.source_url) {
+            this.showNotification('未找到原始播放网页URL', 'error');
+            return;
         }
+        window.open(task.source_url, '_blank');
     }
 
     editTask(taskId) {

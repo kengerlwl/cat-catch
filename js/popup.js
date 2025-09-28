@@ -115,7 +115,7 @@ function AddMedia(data, currentTab = true) {
                 <img src="img/invoke.svg" class="icon invoke ${G.invoke ? "" : "hide"}"" id="invoke" title="${i18n.invoke}"/>
                 <img src="img/send.svg" class="icon send ${G.send2localManual || G.send2local ? "" : "hide"}"" id="send2local" title="${i18n.send2local}"/>
                 <img src="img/mqtt.svg" class="icon mqtt ${G.mqttEnable ? "" : "hide"}" id="mqtt" title="${i18n.send2MQTT}"/>
-                <img src="img/backend.svg" class="icon backend ${data.parsing == "m3u8" ? "" : "hide"}" id="backendDownload" title="后台下载"/>
+                <img src="../flask-m3u8-manager/static/下载.png" class="icon backend ${data.parsing == "m3u8" ? "" : "hide"}" id="backendDownload" title="后台下载"/>
             </div>
             <div class="url hide">
                 <div id="mediaInfo" data-state="false">
@@ -412,44 +412,57 @@ function AddMedia(data, currentTab = true) {
         $backendButton.addClass('backend-sending').prop('disabled', true);
         Tips("正在添加到后台下载队列...", 2000);
 
-        // 发送到Flask后台
-        const taskData = {
-            url: data.url,
-            title: data.title || data.name,
-            custom_dir: data.downFileName || ""
-        };
-
-        fetch('http://localhost:5001/api/tasks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(taskData)
-        })
-        .then(response => response.json())
-        .then(responseData => {
-            if (responseData.task_id) {
-                Tips("任务已添加到后台下载队列！任务ID: " + responseData.task_id, 3000);
-
-                // 询问是否打开管理界面
-                if (confirm("是否打开下载管理界面？")) {
-                    if (G.isFirefox) {
-                        window.location.href = 'http://localhost:5001';
-                    } else {
-                        chrome.tabs.create({ url: 'http://localhost:5001' });
-                    }
+        // 获取当前标签页信息用于debug
+        chrome.tabs.get(data.tabId, function(tab) {
+            const taskData = {
+                url: data.url,
+                title: data.title || data.name,
+                custom_dir: data.downFileName || "",
+                source_url: data.webUrl || data.requestHeaders?.referer || data.initiator || "",
+                debug: {
+                    from: "popup.js",
+                    data_webUrl: data.webUrl,
+                    data_referer: data.requestHeaders?.referer,
+                    data_initiator: data.initiator,
+                    data_tabId: data.tabId,
+                    data_requestHeaders: data.requestHeaders,
+                    data_title: data.title,
+                    data_favIconUrl: data.favIconUrl,
+                    final_source_url: data.webUrl || data.requestHeaders?.referer || data.initiator || "",
+                    timestamp: new Date().toISOString(),
+                    // 实际获取的标签页信息
+                    current_tab_info: tab ? {
+                        id: tab.id,
+                        url: tab.url,
+                        title: tab.title,
+                        status: tab.status
+                    } : "无法获取标签页信息"
                 }
-            } else {
-                Tips("添加任务失败: " + (responseData.error || "未知错误"), 3000);
-            }
-        })
-        .catch(error => {
-            console.error('Backend download error:', error);
-            Tips("网络错误: " + error.message, 3000);
-        })
-        .finally(() => {
-            // 恢复按钮状态
-            $backendButton.removeClass('backend-sending').prop('disabled', false);
+            };
+
+             fetch('http://localhost:5001/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(taskData)
+            })
+            .then(response => response.json())
+            .then(responseData => {
+                if (responseData.task_id) {
+                    Tips("✅ 任务已成功添加到后台下载队列！\n任务ID: " + responseData.task_id + "\n可在Flask管理界面查看下载进度", 4000);
+                } else {
+                    Tips("添加任务失败: " + (responseData.error || "未知错误"), 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Backend download error:', error);
+                Tips("网络错误: " + error.message, 3000);
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                $backendButton.removeClass('backend-sending').prop('disabled', false);
+            });
         });
 
         return false;

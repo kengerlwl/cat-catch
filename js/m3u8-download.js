@@ -8,9 +8,11 @@ const params = new URLSearchParams(location.search);
 const _m3u8Url = params.get("url");
 const referer = params.get("referer");
 let requestHeaders = {};
-let _initiator = "";
-let _title = "";
-let _fileName = "";
+let _initiator = params.get("initiator") || "";
+let _title = params.get("title") || "";
+let _fileName = params.get("filename") || "";
+const _tabId = parseInt(params.get("tabid")) || null;
+const _sourcePageUrl = params.get("source_page_url") || ""; // 新增：直接从参数获取完整的源页面URL
 
 // 全局变量
 let _m3u8Content;   // 储存m3u8文件内容
@@ -86,9 +88,7 @@ function bindEvents() {
         openMp4Converter();
     });
 
-    $("#backendDownload").click(function() {
-        sendToBackend();
-    });
+    // 后台下载功能已移至popup页面，此处不再提供
 
     bindOtherEvents();
 }
@@ -470,58 +470,7 @@ function downloadDataURL(dataUrl, filename) {
     a.click();
 }
 
-// 发送到后台下载
-function sendToBackend() {
-    if (!_m3u8Url) {
-        alert("请先解析M3U8链接");
-        return;
-    }
-
-    if (_fragments.length === 0) {
-        alert("没有可下载的切片");
-        return;
-    }
-
-    // 获取任务配置
-    const config = getCurrentTaskConfig();
-
-    // 发送到Flask后台
-    const taskData = {
-        url: _m3u8Url,
-        title: config.title,
-        custom_dir: config.customFilename || ""
-    };
-
-    $("#backendDownload").prop("disabled", true).html("🔄 添加中...");
-
-    fetch('http://localhost:5001/api/tasks', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(taskData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.task_id) {
-            alert("任务已添加到后台下载队列！\n任务ID: " + data.task_id);
-
-            // 询问是否打开管理界面
-            if (confirm("是否打开下载管理界面？")) {
-                window.open('http://localhost:5001', '_blank');
-            }
-        } else {
-            alert("添加任务失败: " + (data.error || "未知错误"));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert("网络错误: " + error.message);
-    })
-    .finally(() => {
-        $("#backendDownload").prop("disabled", false).html("🚀 后台下载");
-    });
-}
+// 后台下载功能已移至popup页面
 
 // 获取当前任务配置
 function getCurrentTaskConfig() {
