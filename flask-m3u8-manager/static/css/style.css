@@ -607,6 +607,22 @@ section h2 {
     display: flex;
     justify-content: center;
     gap: 15px;
+    flex-wrap: wrap;
+}
+
+.nav-description {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.nav-description p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
 }
 
 .settings-panel {

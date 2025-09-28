@@ -262,6 +262,7 @@ class Config(db.Model):
             ('max_retry_count', AppConfig.MAX_RETRY_COUNT, 'int', '最大重试次数'),
             ('ffmpeg_threads', AppConfig.FFMPEG_THREADS, 'int', 'FFmpeg转换线程数'),
             ('auto_cleanup_days', AppConfig.AUTO_CLEANUP_DAYS, 'int', '自动清理天数'),
+            ('enable_ai_naming', False, 'bool', '启用AI智能命名功能'),
         ]
 
         for key, value, value_type, description in default_configs:
@@ -330,3 +331,130 @@ class DownloadStatistics(db.Model):
 
         db.session.commit()
         return stats
+
+
+class Prompts(db.Model):
+    """Prompts存储模型"""
+    __tablename__ = 'prompts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text, nullable=False)
+    description = db.Column(db.String(500), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __init__(self, key, value, description=""):
+        self.key = key
+        self.value = value
+        self.description = description
+        self.created_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'key': self.key,
+            'value': self.value,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def get_prompt(cls, key):
+        """根据key获取prompt"""
+        prompt = cls.query.filter_by(key=key).first()
+        return prompt.value if prompt else None
+
+    @classmethod
+    def set_prompt(cls, key, value, description=""):
+        """设置或更新prompt"""
+        prompt = cls.query.filter_by(key=key).first()
+        if prompt:
+            prompt.value = value
+            prompt.description = description
+            prompt.updated_at = datetime.utcnow()
+        else:
+            prompt = cls(key=key, value=value, description=description)
+            db.session.add(prompt)
+
+        db.session.commit()
+        return prompt
+
+
+class LLMConfig:
+    """LLM配置管理类 - 使用Config表存储LLM相关配置"""
+
+    # LLM配置的键名
+    LLM_API_URL = 'llm_api_url'
+    LLM_API_KEY = 'llm_api_key'
+    LLM_DEFAULT_MODEL = 'llm_default_model'
+    LLM_DEFAULT_MAX_TOKENS = 'llm_default_max_tokens'
+    LLM_TIMEOUT = 'llm_timeout'
+
+    @classmethod
+    def get_llm_config(cls):
+        """
+        获取LLM配置
+
+        Returns:
+            包含LLM配置的字典
+        """
+        return {
+            'api_url': Config.get_value(cls.LLM_API_URL, 'https://globalai.vip/v1/chat/completions'),
+            'api_key': Config.get_value(cls.LLM_API_KEY, ''),
+            'default_model': Config.get_value(cls.LLM_DEFAULT_MODEL, 'gpt-4.1'),
+            'default_max_tokens': Config.get_value(cls.LLM_DEFAULT_MAX_TOKENS, 4096),
+            'timeout': Config.get_value(cls.LLM_TIMEOUT, 30)
+        }
+
+    @classmethod
+    def set_llm_config(cls, api_url=None, api_key=None, default_model=None,
+                      default_max_tokens=None, timeout=None):
+        """
+        设置LLM配置
+
+        Args:
+            api_url: API接口地址
+            api_key: API密钥
+            default_model: 默认模型名称
+            default_max_tokens: 默认最大token数
+            timeout: 请求超时时间（秒）
+        """
+        if api_url is not None:
+            Config.set_value(cls.LLM_API_URL, api_url, 'str', 'LLM API接口地址')
+
+        if api_key is not None:
+            Config.set_value(cls.LLM_API_KEY, api_key, 'str', 'LLM API密钥')
+
+        if default_model is not None:
+            Config.set_value(cls.LLM_DEFAULT_MODEL, default_model, 'str', 'LLM默认模型')
+
+        if default_max_tokens is not None:
+            Config.set_value(cls.LLM_DEFAULT_MAX_TOKENS, default_max_tokens, 'int', 'LLM默认最大token数')
+
+        if timeout is not None:
+            Config.set_value(cls.LLM_TIMEOUT, timeout, 'int', 'LLM请求超时时间（秒）')
+
+        return cls.get_llm_config()
+
+    @classmethod
+    def init_default_llm_config(cls):
+        """
+        初始化默认LLM配置
+        """
+        # 检查是否已存在配置
+        existing_config = Config.query.filter_by(key=cls.LLM_API_URL).first()
+        if existing_config:
+            return  # 已存在配置，不覆盖
+
+        # 设置默认配置
+        cls.set_llm_config(
+            api_url='https://globalai.vip/v1/chat/completions',
+            api_key='sk-rEh0PI8OkwAyOQbRX9xO7AwdrPPvhuin7x2FN7F96EAfI7ai',
+            default_model='gpt-4.1',
+            default_max_tokens=4096,
+            timeout=30
+        )

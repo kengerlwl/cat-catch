@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM配置 - M3U8下载管理器</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .config-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .config-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .form-control, .form-select {
+            border-radius: 6px;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .alert {
+            border-radius: 8px;
+        }
+        .password-input {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: none;
+            color: #6c757d;
+            cursor: pointer;
+        }
+        .test-result {
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-cloud-download"></i> M3U8下载管理器
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-house"></i> 首页
+                </a>
+                <a class="nav-link" href="/prompts">
+                    <i class="bi bi-chat-text"></i> Prompt管理
+                </a>
+                <a class="nav-link active" href="/llm-config">
+                    <i class="bi bi-gear"></i> LLM配置
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 页面标题 -->
+        <div class="row mb-4">
+            <div class="col">
+                <h2><i class="bi bi-gear text-primary"></i> LLM配置</h2>
+                <p class="text-muted">配置大模型API的连接参数，包括API地址、密钥和默认参数。</p>
+            </div>
+        </div>
+
+        <!-- 消息提示 -->
+        <div id="alertContainer"></div>
+
+        <div class="row">
+            <!-- 配置表单 -->
+            <div class="col-lg-8">
+                <div class="card config-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-sliders"></i> LLM服务配置
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="configForm">
+                            <div class="mb-3">
+                                <label for="apiUrl" class="form-label">
+                                    <i class="bi bi-link-45deg"></i> API地址 <span class="text-danger">*</span>
+                                </label>
+                                <input type="url" class="form-control" id="apiUrl" required
+                                       placeholder="https://api.openai.com/v1/chat/completions">
+                                <div class="form-text">大模型API的完整地址</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="apiKey" class="form-label">
+                                    <i class="bi bi-key"></i> API密钥 <span class="text-danger">*</span>
+                                </label>
+                                <div class="password-input">
+                                    <input type="password" class="form-control" id="apiKey" required
+                                           placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                                    <button type="button" class="password-toggle" onclick="togglePassword('apiKey')">
+                                        <i class="bi bi-eye" id="apiKeyIcon"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">用于访问大模型API的密钥</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultModel" class="form-label">
+                                            <i class="bi bi-cpu"></i> 默认模型
+                                        </label>
+                                        <input type="text" class="form-control" id="defaultModel"
+                                               placeholder="gpt-4.1">
+                                        <div class="form-text">默认使用的模型名称</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultMaxTokens" class="form-label">
+                                            <i class="bi bi-hash"></i> 最大Token数
+                                        </label>
+                                        <input type="number" class="form-control" id="defaultMaxTokens"
+                                               min="1" max="32000" placeholder="4096">
+                                        <div class="form-text">单次请求的最大token数</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="timeout" class="form-label">
+                                    <i class="bi bi-clock"></i> 超时时间（秒）
+                                </label>
+                                <input type="number" class="form-control" id="timeout"
+                                       min="5" max="300" placeholder="30">
+                                <div class="form-text">API请求的超时时间</div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-primary" onclick="saveConfig()">
+                                    <i class="bi bi-check-circle"></i> 保存配置
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="loadConfig()">
+                                    <i class="bi bi-arrow-clockwise"></i> 重新加载
+                                </button>
+                                <button type="button" class="btn btn-outline-info" onclick="testConnection()">
+                                    <i class="bi bi-wifi"></i> 测试连接
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配置说明 -->
+            <div class="col-lg-4">
+                <div class="card config-card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-info-circle"></i> 配置说明
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6><i class="bi bi-link-45deg text-primary"></i> API地址</h6>
+                            <p class="small text-muted">
+                                输入完整的API端点地址，通常以 <code>/chat/completions</code> 结尾。
+                            </p>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6><i class="bi bi-key text-warning"></i> API密钥</h6>
+                            <p class="small text-muted">
+                                从API提供商获取的访问密钥，通常以 <code>sk-</code> 开头。请妥善保管。
+                            </p>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6><i class="bi bi-cpu text-success"></i> 模型选择</h6>
+                            <p class="small text-muted">
+                                常见模型：<code>gpt-4</code>、<code>gpt-3.5-turbo</code>、<code>claude-3</code> 等。
+                            </p>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6><i class="bi bi-hash text-info"></i> Token限制</h6>
+                            <p class="small text-muted">
+                                不同模型有不同的token限制，请根据实际需要设置。
+                            </p>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>注意：</strong>配置保存后会立即生效，请确保参数正确。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 连接状态 -->
+                <div class="card config-card mt-3">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-activity"></i> 连接状态
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="connectionStatus">
+                            <div class="text-center text-muted">
+                                <i class="bi bi-question-circle" style="font-size: 2rem;"></i>
+                                <p class="mt-2">点击"测试连接"检查状态</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
+        });
+
+        // 显示消息
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertId = 'alert-' + Date.now();
+
+            const alertHtml = `
+                <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+            alertContainer.innerHTML = alertHtml;
+
+            // 5秒后自动消失
+            setTimeout(() => {
+                const alert = document.getElementById(alertId);
+                if (alert) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // 切换密码显示
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(fieldId + 'Icon');
+
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                field.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/llm/config');
+                const data = await response.json();
+
+                if (data.success) {
+                    const config = data.config;
+
+                    document.getElementById('apiUrl').value = config.api_url || '';
+                    document.getElementById('apiKey').value = config.api_key || '';
+                    document.getElementById('defaultModel').value = config.default_model || '';
+                    document.getElementById('defaultMaxTokens').value = config.default_max_tokens || '';
+                    document.getElementById('timeout').value = config.timeout || '';
+
+                    showAlert('配置加载成功', 'success');
+                } else {
+                    showAlert('加载配置失败: ' + data.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'danger');
+            }
+        }
+
+        // 保存配置
+        async function saveConfig() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const defaultModel = document.getElementById('defaultModel').value.trim();
+            const defaultMaxTokens = document.getElementById('defaultMaxTokens').value.trim();
+            const timeout = document.getElementById('timeout').value.trim();
+
+            if (!apiUrl || !apiKey) {
+                showAlert('请填写必要的配置项（API地址和密钥）', 'warning');
+                return;
+            }
+
+            // 验证URL格式
+            try {
+                new URL(apiUrl);
+            } catch (e) {
+                showAlert('API地址格式不正确', 'warning');
+                return;
+            }
+
+            const configData = {
+                api_url: apiUrl,
+                api_key: apiKey,
+                default_model: defaultModel,
+                default_max_tokens: defaultMaxTokens ? parseInt(defaultMaxTokens) : null,
+                timeout: timeout ? parseInt(timeout) : null
+            };
+
+            try {
+                const response = await fetch('/api/llm/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(configData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    // 重新加载配置以显示最新状态
+                    setTimeout(() => {
+                        loadConfig();
+                    }, 1000);
+                } else {
+                    showAlert(data.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('网络错误: ' + error.message, 'danger');
+            }
+        }
+
+        // 测试连接
+        async function testConnection() {
+            const statusContainer = document.getElementById('connectionStatus');
+
+            // 显示测试中状态
+            statusContainer.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">测试中...</span>
+                    </div>
+                    <p class="mt-2 text-muted">正在测试连接...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/llm/test', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusContainer.innerHTML = `
+                        <div class="text-center text-success">
+                            <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-1"><strong>连接成功</strong></p>
+                            <small class="text-muted">${data.message}</small>
+                        </div>
+                    `;
+                    showAlert('连接测试成功', 'success');
+                } else {
+                    statusContainer.innerHTML = `
+                        <div class="text-center text-danger">
+                            <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-1"><strong>连接失败</strong></p>
+                            <small class="text-muted">${data.error}</small>
+                        </div>
+                    `;
+                    showAlert('连接测试失败: ' + data.error, 'danger');
+                }
+            } catch (error) {
+                statusContainer.innerHTML = `
+                    <div class="text-center text-danger">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-1"><strong>网络错误</strong></p>
+                        <small class="text-muted">${error.message}</small>
+                    </div>
+                `;
+                showAlert('网络错误: ' + error.message, 'danger');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -510,6 +510,7 @@ class M3U8Manager {
                 $('#ffmpegThreads').val(settings.ffmpeg_threads);
                 $('#autoCleanupDays').val(settings.auto_cleanup_days);
                 $('#taskThreadCount').val(settings.thread_count);
+                $('#enableAiNaming').prop('checked', settings.enable_ai_naming || false);
 
                 // 更新队列状态显示
                 $('#activeTasksCount').text(settings.active_tasks_count);
@@ -535,7 +536,8 @@ class M3U8Manager {
             download_timeout: parseInt($('#downloadTimeout').val()),
             max_retry_count: parseInt($('#maxRetryCount').val()),
             ffmpeg_threads: parseInt($('#ffmpegThreads').val()),
-            auto_cleanup_days: parseInt($('#autoCleanupDays').val())
+            auto_cleanup_days: parseInt($('#autoCleanupDays').val()),
+            enable_ai_naming: $('#enableAiNaming').prop('checked')
         };
 
         try {

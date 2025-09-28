@@ -77,7 +77,8 @@ class Config:
         'download_timeout': DOWNLOAD_TIMEOUT,
         'max_retry_count': MAX_RETRY_COUNT,
         'ffmpeg_threads': FFMPEG_THREADS,
-        'auto_cleanup_days': AUTO_CLEANUP_DAYS
+        'auto_cleanup_days': AUTO_CLEANUP_DAYS,
+        'enable_ai_naming': False
     }
 
 class DevelopmentConfig(Config):

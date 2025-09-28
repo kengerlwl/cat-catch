@@ -15,6 +15,11 @@
             <div class="header-controls">
                 <button id="settingsBtn" class="btn btn-info">⚙️ 设置</button>
                 <button id="queueStatusBtn" class="btn btn-secondary">📊 队列状态</button>
+                <a href="/prompts" class="btn btn-primary" title="管理大模型提示词模板">💬 Prompt管理</a>
+                <a href="/llm-config" class="btn btn-warning" title="配置大模型API参数">🤖 LLM配置</a>
+            </div>
+            <div class="nav-description">
+                <p>💡 新功能：现在支持大模型集成！可以管理提示词模板和配置API参数</p>
             </div>
         </header>
 
@@ -71,6 +76,17 @@
                         <label for="autoCleanupDays">自动清理天数:</label>
                         <input type="number" id="autoCleanupDays" class="form-control" min="1" max="30" value="7">
                         <small>自动清理完成任务的天数 (1-30天)</small>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h3>🤖 AI功能</h3>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="enableAiNaming" class="form-check-input">
+                            <label for="enableAiNaming" class="form-check-label">启用AI智能命名</label>
+                        </div>
+                        <small>启用后，创建M3U8任务时会自动使用AI优化电影名称</small>
                     </div>
                 </div>
             </div>

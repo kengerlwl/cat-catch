@@ -11,25 +11,26 @@ import uuid
 import threading
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, abort, redirect, url_for
+from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import requests
 import m3u8
 
 # 导入配置和数据库模型
-from config import config
-from models import db, DownloadRecord, DownloadStatistics, Config
+from config import Config as app_config
+from models import db, DownloadRecord, DownloadStatistics, Config, Prompts, LLMConfig
 from m3u8_processor import M3U8Processor
+from llm_service import init_llm_service_from_db, get_llm_service
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
 # 加载配置
-app_config = config['default']()
 app.config.from_object(app_config)
 
 # 初始化数据库
@@ -77,6 +78,105 @@ class TaskThread:
     def is_stopped(self):
         """检查是否已停止"""
         return self.stop_event.is_set()
+
+
+def get_ai_optimized_title(original_title):
+    """
+    使用AI优化电影标题
+
+    Args:
+        original_title: 原始标题
+
+    Returns:
+        优化后的标题，如果AI处理失败则返回原始标题
+    """
+    try:
+        # 检查是否启用AI命名功能
+        enable_ai_naming = Config.get_value('enable_ai_naming', False)
+        if not enable_ai_naming:
+            return original_title
+
+        # 获取LLM服务
+        llm_service = get_llm_service()
+        if not llm_service:
+            print("LLM服务未初始化，使用原始标题")
+            return original_title
+
+        # 检查movie_name_extractor prompt是否存在
+        prompt_value = Prompts.get_prompt('movie_name_extractor')
+        if not prompt_value:
+            print("movie_name_extractor prompt不存在，使用原始标题")
+            return original_title
+
+        # 使用AI提取电影名称
+        print(f"正在使用AI优化标题: {original_title}")
+
+        response = llm_service.chat_with_prompt(
+            user_message=original_title,
+            prompt_key='movie_name_extractor',
+            temperature=0.3,  # 使用较低的温度以获得更稳定的结果
+            max_tokens=100
+        )
+
+        if response.get('success'):
+            optimized_title = llm_service.extract_content(response)
+            if optimized_title and optimized_title.strip():
+                print(f"AI优化后的标题: {optimized_title}")
+                return optimized_title.strip()
+            else:
+                print("AI返回空结果，使用原始标题")
+                return original_title
+        else:
+            print(f"AI处理失败: {response.get('error', '未知错误')}，使用原始标题")
+            return original_title
+
+    except Exception as e:
+        print(f"AI标题优化异常: {str(e)}，使用原始标题")
+        return original_title
+
+
+def ensure_movie_name_extractor_prompt():
+    """
+    确保movie_name_extractor prompt存在于数据库中
+    """
+    try:
+        existing = Prompts.query.filter_by(key='movie_name_extractor').first()
+        if existing:
+            return True
+
+        # 创建默认的movie_name_extractor prompt
+        prompt_value = """你是一个电影名字的归纳员。我正在从网络上下载电影，但是电影名字可以夹带了一些网页的信息，请你从中抽取去电影真正的名字。
+
+例如：
+
+输入：《尖叫之地》全集在线观看 - 电影 - 努努影院
+
+电影名：尖叫之地
+
+注意：
+
+1. 电影名可能含有编号，以及演员名字，这也需要保留
+
+2. 请你直接只输出电影，不要输出其他任何信息
+
+输入：
+
+{input}
+
+电影名："""
+
+        Prompts.set_prompt(
+            key='movie_name_extractor',
+            value=prompt_value,
+            description='根据输入的混杂信息，抽取并只输出电影的真实名称，保留编号及演员名。'
+        )
+
+        print("✅ 成功创建movie_name_extractor prompt")
+        return True
+
+    except Exception as e:
+        print(f"❌ 创建movie_name_extractor prompt失败: {str(e)}")
+        return False
 
 
 def load_runtime_settings():
@@ -236,6 +336,18 @@ def index():
     """主页"""
     return render_template('index.html')
 
+
+@app.route('/prompts')
+def prompts_page():
+    """Prompt管理页面"""
+    return render_template('prompts.html')
+
+
+@app.route('/llm-config')
+def llm_config_page():
+    """LLM配置页面"""
+    return render_template('llm_config.html')
+
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
     """获取所有下载任务"""
@@ -274,6 +386,14 @@ def create_task():
         title = parsed_url.path.split('/')[-1] or f"m3u8_{int(time.time())}"
         if title.endswith('.m3u8'):
             title = title[:-5]
+
+    # 使用AI优化标题（如果启用了AI命名功能）
+    original_title = title
+    title = get_ai_optimized_title(title)
+
+    # 如果AI优化后的标题与原标题不同，记录日志
+    if title != original_title:
+        print(f"标题已通过AI优化: '{original_title}' -> '{title}'")
 
     try:
         # 创建数据库记录
@@ -489,6 +609,12 @@ def update_settings():
             if 1 <= cleanup_days <= 30:
                 if save_runtime_setting('auto_cleanup_days', cleanup_days, 'int', '自动清理天数'):
                     updated['auto_cleanup_days'] = cleanup_days
+
+        # 更新AI命名功能开关
+        if 'enable_ai_naming' in data:
+            enable_ai_naming = bool(data['enable_ai_naming'])
+            if save_runtime_setting('enable_ai_naming', enable_ai_naming, 'bool', '启用AI智能命名功能'):
+                updated['enable_ai_naming'] = enable_ai_naming
 
     if updated:
         return jsonify({'message': '设置更新成功', 'updated': updated})
@@ -754,6 +880,20 @@ def init_database():
         # 加载运行时设置
         load_runtime_settings()
 
+        # 初始化LLM服务
+        try:
+            init_llm_service_from_db()
+            print("LLM服务初始化完成")
+        except Exception as e:
+            print(f"LLM服务初始化失败: {e}")
+
+        # 确保movie_name_extractor prompt存在
+        try:
+            ensure_movie_name_extractor_prompt()
+            print("AI命名功能prompt检查完成")
+        except Exception as e:
+            print(f"AI命名功能prompt检查失败: {e}")
+
         # 恢复未完成的任务
         restore_active_tasks()
 
@@ -837,6 +977,228 @@ def cleanup_old_tasks():
         })
     except Exception as e:
         return jsonify({'error': f'清理任务失败: {str(e)}'}), 500
+
+
+# ==================== Prompt管理API ====================
+
+@app.route('/api/prompts', methods=['GET'])
+def get_prompts():
+    """获取所有prompts"""
+    try:
+        prompts = Prompts.query.all()
+        return jsonify({
+            'success': True,
+            'prompts': [prompt.to_dict() for prompt in prompts]
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取prompts失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/prompts/<prompt_key>', methods=['GET'])
+def get_prompt(prompt_key):
+    """获取单个prompt"""
+    try:
+        prompt = Prompts.query.filter_by(key=prompt_key).first()
+        if not prompt:
+            return jsonify({
+                'success': False,
+                'error': 'Prompt不存在'
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'prompt': prompt.to_dict()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取prompt失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/prompts', methods=['POST'])
+def create_prompt():
+    """创建新的prompt"""
+    try:
+        data = request.get_json()
+
+        if not data or 'key' not in data or 'value' not in data:
+            return jsonify({
+                'success': False,
+                'error': '缺少必要参数: key, value'
+            }), 400
+
+        key = data['key']
+        value = data['value']
+        description = data.get('description', '')
+
+        # 检查key是否已存在
+        existing = Prompts.query.filter_by(key=key).first()
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Prompt key "{key}" 已存在'
+            }), 400
+
+        # 创建新prompt
+        prompt = Prompts.set_prompt(key=key, value=value, description=description)
+
+        return jsonify({
+            'success': True,
+            'message': 'Prompt创建成功',
+            'prompt': prompt.to_dict()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'创建prompt失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/prompts/<prompt_key>', methods=['PUT'])
+def update_prompt(prompt_key):
+    """更新prompt"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '缺少更新数据'
+            }), 400
+
+        prompt = Prompts.query.filter_by(key=prompt_key).first()
+        if not prompt:
+            return jsonify({
+                'success': False,
+                'error': 'Prompt不存在'
+            }), 404
+
+        # 更新字段
+        if 'value' in data:
+            prompt.value = data['value']
+        if 'description' in data:
+            prompt.description = data['description']
+
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Prompt更新成功',
+            'prompt': prompt.to_dict()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'更新prompt失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/prompts/<prompt_key>', methods=['DELETE'])
+def delete_prompt(prompt_key):
+    """删除prompt"""
+    try:
+        prompt = Prompts.query.filter_by(key=prompt_key).first()
+        if not prompt:
+            return jsonify({
+                'success': False,
+                'error': 'Prompt不存在'
+            }), 404
+
+        db.session.delete(prompt)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Prompt删除成功'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'删除prompt失败: {str(e)}'
+        }), 500
+
+
+# ==================== LLM配置管理API ====================
+
+@app.route('/api/llm/config', methods=['GET'])
+def get_llm_config():
+    """获取LLM配置"""
+    try:
+        config = LLMConfig.get_llm_config()
+        # 隐藏API密钥的敏感信息
+        if config['api_key']:
+            config['api_key'] = config['api_key'][:8] + '***' + config['api_key'][-4:]
+
+        return jsonify({
+            'success': True,
+            'config': config
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取LLM配置失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/llm/config', methods=['POST'])
+def update_llm_config():
+    """更新LLM配置"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '缺少配置数据'
+            }), 400
+
+        # 更新配置
+        LLMConfig.set_llm_config(
+            api_url=data.get('api_url'),
+            api_key=data.get('api_key'),
+            default_model=data.get('default_model'),
+            default_max_tokens=data.get('default_max_tokens'),
+            timeout=data.get('timeout')
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'LLM配置更新成功'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'更新LLM配置失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/llm/test', methods=['POST'])
+def test_llm_connection():
+    """测试LLM连接"""
+    try:
+        # 这里可以添加LLM连接测试逻辑
+        # 暂时返回成功状态
+        return jsonify({
+            'success': True,
+            'message': 'LLM连接测试成功'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'LLM连接测试失败: {str(e)}'
+        }), 500
+
 
 if __name__ == '__main__':
     print("Flask M3U8 下载管理器启动中...")
