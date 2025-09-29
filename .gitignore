@@ -18,3 +18,9 @@ dist/
 # PyInstaller
 /flask-m3u8-manager/__pycache__/
 /flask-m3u8-manager/*.spec.backup
+
+# FFmpeg 二进制文件（打包时临时解压）
+/flask-m3u8-manager/bin/
+
+# 测试文件
+/flask-m3u8-manager/test_ffmpeg_integration.py

@@ -30,6 +30,7 @@
 #### 前置要求：
 - Python 3.8+ 已安装
 - pip 包管理器可用
+- **FFmpeg 支持**：确保 `bin.7z` 文件存在于项目根目录
 
 #### 构建步骤：
 ```bash
@@ -43,13 +44,33 @@ build_exe.bat
 构建脚本会自动：
 - 安装所需依赖
 - 使用PyInstaller打包应用
-- 生成独立的EXE文件
+- **打包时自动解压 bin.7z 中的 FFmpeg 文件**
+- 生成独立的EXE文件（包含FFmpeg）
+
+#### FFmpeg 集成特性：
+- **智能打包**：只在打包时解压 FFmpeg，开发时保持仓库轻量
+- **自动包含**：FFmpeg 可执行文件和依赖库会自动打包到 EXE 中
+- **无需安装**：打包后的 EXE 文件无需系统安装 FFmpeg
+- **开发友好**：开发时使用系统 FFmpeg，无需解压 bin.7z
 
 ### Linux/macOS 本地构建
 
 #### 前置要求：
 - Python 3.8+ 已安装
-- pip3 包管理器可用
+- pip 包管理器可用
+- **FFmpeg 支持**：确保 `bin.7z` 文件存在于项目根目录
+- **p7zip 工具**：用于解压 7z 文件（`brew install p7zip` 或 `sudo apt install p7zip-full`）
+
+#### 构建步骤：
+```bash
+# 1. 进入Flask应用目录
+cd flask-m3u8-manager
+
+# 2. 运行构建脚本
+./build_exe.sh
+```
+
+构建过程与 Windows 类似，会在打包时自动处理 FFmpeg 集成。
 
 #### 构建步骤：
 ```bash
@@ -131,6 +152,11 @@ hiddenimports=[
 4. **EXE文件过大**：
    - 在spec文件中添加 `excludes` 排除不需要的模块
    - 使用 `upx=True` 启用压缩
+
+5. **FFmpeg 相关问题**：
+   - **bin.7z 不存在**：确保 `bin.7z` 文件在项目根目录
+   - **解压失败**：手动解压 `bin.7z` 到 `bin/` 目录
+   - **转换失败**：检查打包后的 EXE 是否包含 `bin/ffmpeg.exe`
 
 ### 调试模式
 

@@ -64,6 +64,13 @@ class Config:
     def get_ffmpeg_path():
         """根据操作系统自动选择FFmpeg路径"""
         if platform.system() == 'Windows':
+            # 检查是否为 PyInstaller 打包的可执行文件
+            if hasattr(sys, '_MEIPASS'):
+                # 在打包后的可执行文件中，ffmpeg 位于临时目录的 bin 子目录
+                packaged_ffmpeg = os.path.join(sys._MEIPASS, 'bin', 'ffmpeg.exe')
+                if os.path.exists(packaged_ffmpeg):
+                    return packaged_ffmpeg
+
             # Windows环境下优先使用项目内置的ffmpeg.exe
             local_ffmpeg = os.path.join(os.path.dirname(__file__), 'bin', 'ffmpeg.exe')
             if os.path.exists(local_ffmpeg):
