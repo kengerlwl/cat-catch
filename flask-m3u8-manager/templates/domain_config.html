@@ -77,10 +77,10 @@
 
 {% block content %}
 <!-- 页面标题 -->
-<div class="page-header">
-    <h1><i class="bi bi-globe me-2"></i>域名配置管理</h1>
-    <p>为不同域名设置专用的 Headers 和 Cookies，这些配置将在访问 M3U8 和下载切片时自动应用。</p>
-</div>
+ <div class="page-header">
+     <h1><i class="bi bi-globe me-2"></i>域名配置管理</h1>
+     <p>为不同域名设置专用的 Headers（包括 Cookie），这些配置将在访问 M3U8 和下载切片时自动应用。</p>
+ </div>
 
 <!-- 提示信息 -->
 <div id="alertContainer">
@@ -103,37 +103,18 @@
                 <div class="form-text">请输入完整域名，不包含协议（http://或https://）</div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="headers" class="form-label">Headers (JSON格式)</label>
-                        <textarea id="headers" class="form-control textarea-large" placeholder="请输入JSON格式的headers"></textarea>
-                        <div class="form-text">自定义HTTP请求头，将与默认headers合并</div>
-                        <div class="json-example">
+            <div class="mb-3">
+                <label for="headers" class="form-label">Headers (JSON格式)</label>
+                <textarea id="headers" class="form-control textarea-large" placeholder="请输入JSON格式的headers"></textarea>
+                <div class="form-text">自定义HTTP请求头，包括Cookie等，将与默认headers合并</div>
+                <div class="json-example">
 示例：
 {
   "Authorization": "Bearer your-token",
-  "X-Custom-Header": "custom-value",
-  "User-Agent": "Custom User Agent"
+  "Cookie": "session_id=abc123; user_token=xyz789; preferences=theme%3Ddark",
+  "User-Agent": "Custom User Agent",
+  "Referer": "https://example.com"
 }
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="cookies" class="form-label">Cookies (JSON格式)</label>
-                        <textarea id="cookies" class="form-control textarea-large" placeholder="请输入JSON格式的cookies"></textarea>
-                        <div class="form-text">自定义Cookie，将自动转换为Cookie请求头</div>
-                        <div class="json-example">
-示例：
-{
-  "session_id": "abc123",
-  "user_token": "xyz789",
-  "preferences": "theme=dark"
-}
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -195,7 +176,6 @@
     function clearForm() {
         $('#domain').val('');
         $('#headers').val('');
-        $('#cookies').val('');
     }
 
     function loadConfigs() {
@@ -233,10 +213,9 @@
                 <div class="config-item">
                     <div class="config-info">
                         <div class="config-domain">${domain}</div>
-                        <div class="config-details">
-                            <div><strong>Headers:</strong> ${Object.keys(config.headers || {}).length} 项</div>
-                            <div><strong>Cookies:</strong> ${Object.keys(config.cookies || {}).length} 项</div>
-                        </div>
+                         <div class="config-details">
+                             <div><strong>Headers:</strong> ${Object.keys(config.headers || {}).length} 项</div>
+                         </div>
                     </div>
                     <div class="config-actions">
                         <button class="btn btn-sm btn-outline-primary" onclick="editConfig('${domain}')">
@@ -255,7 +234,6 @@
     function saveConfig() {
         const domain = $('#domain').val().trim();
         const headersText = $('#headers').val().trim();
-        const cookiesText = $('#cookies').val().trim();
 
         if (!domain) {
             showAlert('请输入域名', 'error');
@@ -263,7 +241,6 @@
         }
 
         let headers = {};
-        let cookies = {};
 
         // 解析headers JSON
         if (headersText) {
@@ -275,20 +252,9 @@
             }
         }
 
-        // 解析cookies JSON
-        if (cookiesText) {
-            try {
-                cookies = JSON.parse(cookiesText);
-            } catch (e) {
-                showAlert('Cookies JSON格式错误: ' + e.message, 'error');
-                return;
-            }
-        }
-
         const data = {
             domain: domain,
-            headers: headers,
-            cookies: cookies
+            headers: headers
         };
 
         $.ajax({
@@ -318,7 +284,6 @@
                     const config = response.data[domain];
                     $('#domain').val(domain);
                     $('#headers').val(JSON.stringify(config.headers || {}, null, 2));
-                    $('#cookies').val(JSON.stringify(config.cookies || {}, null, 2));
 
                     // 滚动到表单
                     $('html, body').animate({

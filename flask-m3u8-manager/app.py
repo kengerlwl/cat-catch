@@ -214,7 +214,7 @@ def get_domain_config(domain):
     with domain_config_lock:
         return domain_configs.get(domain, {})
 
-def set_domain_config(domain, headers=None, cookies=None):
+def set_domain_config(domain, headers=None):
     """设置指定域名的配置"""
     with domain_config_lock:
         if domain not in domain_configs:
@@ -222,10 +222,8 @@ def set_domain_config(domain, headers=None, cookies=None):
 
         if headers is not None:
             domain_configs[domain]['headers'] = headers
-        if cookies is not None:
-            domain_configs[domain]['cookies'] = cookies
 
-        print(f"✅ 已设置域名 {domain} 的配置: headers={headers}, cookies={cookies}")
+        print(f"✅ 已设置域名 {domain} 的配置: headers={headers}")
 
 def remove_domain_config(domain):
     """删除指定域名的配置"""
@@ -254,20 +252,6 @@ def merge_headers_with_domain_config(url, base_headers=None):
     merged_headers = base_headers.copy() if base_headers else {}
     if 'headers' in domain_config:
         merged_headers.update(domain_config['headers'])
-
-    # 处理cookies
-    if 'cookies' in domain_config and domain_config['cookies']:
-        # 将cookies字典转换为Cookie字符串
-        cookie_parts = []
-        for key, value in domain_config['cookies'].items():
-            cookie_parts.append(f"{key}={value}")
-        if cookie_parts:
-            cookie_string = '; '.join(cookie_parts)
-            # 如果已有Cookie header，则合并
-            if 'Cookie' in merged_headers:
-                merged_headers['Cookie'] = f"{merged_headers['Cookie']}; {cookie_string}"
-            else:
-                merged_headers['Cookie'] = cookie_string
 
     return merged_headers
 
@@ -1531,7 +1515,6 @@ def save_domain_config():
             }), 400
 
         headers = data.get('headers', {})
-        cookies = data.get('cookies', {})
 
         # 验证headers格式
         if headers and not isinstance(headers, dict):
@@ -1540,15 +1523,8 @@ def save_domain_config():
                 'error': 'Headers必须是对象格式'
             }), 400
 
-        # 验证cookies格式
-        if cookies and not isinstance(cookies, dict):
-            return jsonify({
-                'success': False,
-                'error': 'Cookies必须是对象格式'
-            }), 400
-
         # 保存配置
-        set_domain_config(domain, headers, cookies)
+        set_domain_config(domain, headers)
 
         return jsonify({
             'success': True,
