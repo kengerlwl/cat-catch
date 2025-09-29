@@ -557,8 +557,8 @@ section h2 {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 模态框样式 */
-.modal {
+/* 自定义模态框样式（用于首页等特殊modal） */
+.custom-modal {
     display: none;
     position: fixed;
     z-index: 1000;
@@ -569,7 +569,7 @@ section h2 {
     background-color: rgba(0,0,0,0.5);
 }
 
-.modal-content {
+.custom-modal .modal-content {
     background-color: white;
     margin: 5% auto;
     padding: 30px;
@@ -622,7 +622,7 @@ section h2 {
         justify-content: flex-start;
     }
 
-    .modal-content {
+    .custom-modal .modal-content {
         margin: 10% auto;
         padding: 20px;
     }
