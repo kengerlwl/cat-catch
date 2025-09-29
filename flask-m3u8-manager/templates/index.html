@@ -1,27 +1,79 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M3U8 下载管理器</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎬 M3U8 下载管理器</h1>
-            <p class="subtitle">管理您的视频下载任务</p>
-            <div class="header-controls">
-                <button id="settingsBtn" class="btn btn-info">⚙️ 设置</button>
-                <button id="queueStatusBtn" class="btn btn-secondary">📊 队列状态</button>
-                <a href="/prompts" class="btn btn-primary" title="管理大模型提示词模板">💬 Prompt管理</a>
-                <a href="/llm-config" class="btn btn-warning" title="配置大模型API参数">🤖 LLM配置</a>
-            </div>
-            <div class="nav-description">
-                <p>💡 新功能：现在支持大模型集成！可以管理提示词模板和配置API参数</p>
-            </div>
-        </header>
+{% extends "base.html" %}
+
+{% block title %}M3U8 下载管理器 - 首页{% endblock %}
+
+{% block body_class %}index-page{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* 首页专用样式 */
+    .index-page {
+        background: var(--gradient-bg) !important;
+        min-height: 100vh;
+    }
+
+    .index-page .container {
+        padding-top: 2rem;
+    }
+
+    .index-header {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        text-align: center;
+        color: white;
+    }
+
+    .index-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        font-weight: 700;
+    }
+
+    .index-header .subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin-bottom: 1rem;
+    }
+
+    .index-features {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-top: 1rem;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .index-features p {
+        color: rgba(255, 255, 255, 0.9);
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    /* 确保首页的section使用白色背景 */
+    .index-page section {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="index-header">
+    <h1>🎬 M3U8 下载管理器</h1>
+    <p class="subtitle">管理您的视频下载任务</p>
+    <div class="index-features">
+        <p>💡 <strong>新功能：</strong>现在支持域名配置和大模型集成！可以为不同域名设置专用Headers/Cookies，管理提示词模板和配置API参数</p>
+    </div>
+</div>
 
         <!-- 设置面板 -->
         <section id="settingsPanel" class="settings-panel" style="display: none;">
@@ -170,7 +222,6 @@
                 <!-- 任务项将通过JavaScript动态添加 -->
             </div>
         </section>
-    </div>
 
     <!-- 播放模态框 -->
     <!-- 已废弃，直接跳转原始网页，无需弹窗 -->
@@ -218,7 +269,30 @@
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+    // 首页专用JavaScript函数
+    function toggleSettings() {
+        const panel = document.getElementById('settingsPanel');
+        if (panel) {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    function showQueueStatusModal() {
+        const btn = document.getElementById('queueStatusBtn');
+        if (btn) {
+            btn.click();
+        }
+    }
+
+    // 绑定设置按钮事件
+    $(document).ready(function() {
+        $('#settingsBtn').on('click', toggleSettings);
+    });
+</script>
+{% endblock %}

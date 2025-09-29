@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}域名配置管理 - M3U8 下载管理器{% endblock %}
+
+{% block extra_head %}
+<style>
+    .textarea-large {
+        min-height: 120px;
+        font-family: 'Courier New', monospace;
+        resize: vertical;
+    }
+
+    .config-item {
+        padding: 1.25rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        transition: all 0.2s ease;
+    }
+
+    .config-item:last-child {
+        border-bottom: none;
+    }
+
+    .config-item:hover {
+        background-color: #f8f9fa;
+        transform: translateX(4px);
+    }
+
+    .config-info {
+        flex: 1;
+    }
+
+    .config-domain {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .config-details {
+        font-size: 0.875rem;
+        color: var(--secondary-color);
+        line-height: 1.4;
+    }
+
+    .config-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .json-example {
+        background: #f1f3f4;
+        padding: 0.875rem;
+        border-radius: 0.5rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        margin-top: 0.75rem;
+        border-left: 4px solid var(--primary-color);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--secondary-color);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 页面标题 -->
+<div class="page-header">
+    <h1><i class="bi bi-globe me-2"></i>域名配置管理</h1>
+    <p>为不同域名设置专用的 Headers 和 Cookies，这些配置将在访问 M3U8 和下载切片时自动应用。</p>
+</div>
+
+<!-- 提示信息 -->
+<div id="alertContainer">
+    <div id="successAlert" class="alert alert-success" style="display: none;"></div>
+    <div id="errorAlert" class="alert alert-danger" style="display: none;"></div>
+</div>
+
+<!-- 配置表单 -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-plus-circle me-2"></i>添加/编辑域名配置
+        </h5>
+    </div>
+    <div class="card-body">
+        <form id="configForm">
+            <div class="mb-3">
+                <label for="domain" class="form-label">域名 <span class="text-danger">*</span></label>
+                <input type="text" id="domain" class="form-control" placeholder="例如: example.com" required>
+                <div class="form-text">请输入完整域名，不包含协议（http://或https://）</div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="headers" class="form-label">Headers (JSON格式)</label>
+                        <textarea id="headers" class="form-control textarea-large" placeholder="请输入JSON格式的headers"></textarea>
+                        <div class="form-text">自定义HTTP请求头，将与默认headers合并</div>
+                        <div class="json-example">
+示例：
+{
+  "Authorization": "Bearer your-token",
+  "X-Custom-Header": "custom-value",
+  "User-Agent": "Custom User Agent"
+}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="cookies" class="form-label">Cookies (JSON格式)</label>
+                        <textarea id="cookies" class="form-control textarea-large" placeholder="请输入JSON格式的cookies"></textarea>
+                        <div class="form-text">自定义Cookie，将自动转换为Cookie请求头</div>
+                        <div class="json-example">
+示例：
+{
+  "session_id": "abc123",
+  "user_token": "xyz789",
+  "preferences": "theme=dark"
+}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-end">
+                <button type="button" id="clearForm" class="btn btn-secondary me-2">
+                    <i class="bi bi-trash me-1"></i>清空表单
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle me-1"></i>保存配置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 配置列表 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul me-2"></i>已配置的域名
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div id="configList">
+            <!-- 配置项将通过JavaScript动态加载 -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // 加载配置列表
+        loadConfigs();
+
+        // 表单提交
+        $('#configForm').on('submit', function(e) {
+            e.preventDefault();
+            saveConfig();
+        });
+
+        // 清空表单
+        $('#clearForm').on('click', function() {
+            clearForm();
+        });
+    });
+
+    function showAlert(message, type = 'success') {
+        const alertId = type === 'success' ? '#successAlert' : '#errorAlert';
+        $(alertId).text(message).show();
+
+        // 3秒后自动隐藏
+        setTimeout(function() {
+            $(alertId).hide();
+        }, 3000);
+    }
+
+    function clearForm() {
+        $('#domain').val('');
+        $('#headers').val('');
+        $('#cookies').val('');
+    }
+
+    function loadConfigs() {
+        $.get('/api/domain-configs')
+            .done(function(response) {
+                if (response.success) {
+                    renderConfigs(response.data);
+                } else {
+                    showAlert('加载配置失败: ' + response.error, 'error');
+                }
+            })
+            .fail(function() {
+                showAlert('加载配置失败: 网络错误', 'error');
+            });
+    }
+
+    function renderConfigs(configs) {
+        const container = $('#configList');
+        container.empty();
+
+        if (Object.keys(configs).length === 0) {
+            container.html(`
+                <div class="empty-state">
+                    <i class="bi bi-globe"></i>
+                    <p>暂无域名配置</p>
+                    <p>请在上方表单中添加域名配置</p>
+                </div>
+            `);
+            return;
+        }
+
+        Object.keys(configs).forEach(function(domain) {
+            const config = configs[domain];
+            const item = $(`
+                <div class="config-item">
+                    <div class="config-info">
+                        <div class="config-domain">${domain}</div>
+                        <div class="config-details">
+                            <div><strong>Headers:</strong> ${Object.keys(config.headers || {}).length} 项</div>
+                            <div><strong>Cookies:</strong> ${Object.keys(config.cookies || {}).length} 项</div>
+                        </div>
+                    </div>
+                    <div class="config-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editConfig('${domain}')">
+                            <i class="bi bi-pencil me-1"></i>编辑
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig('${domain}')">
+                            <i class="bi bi-trash me-1"></i>删除
+                        </button>
+                    </div>
+                </div>
+            `);
+            container.append(item);
+        });
+    }
+
+    function saveConfig() {
+        const domain = $('#domain').val().trim();
+        const headersText = $('#headers').val().trim();
+        const cookiesText = $('#cookies').val().trim();
+
+        if (!domain) {
+            showAlert('请输入域名', 'error');
+            return;
+        }
+
+        let headers = {};
+        let cookies = {};
+
+        // 解析headers JSON
+        if (headersText) {
+            try {
+                headers = JSON.parse(headersText);
+            } catch (e) {
+                showAlert('Headers JSON格式错误: ' + e.message, 'error');
+                return;
+            }
+        }
+
+        // 解析cookies JSON
+        if (cookiesText) {
+            try {
+                cookies = JSON.parse(cookiesText);
+            } catch (e) {
+                showAlert('Cookies JSON格式错误: ' + e.message, 'error');
+                return;
+            }
+        }
+
+        const data = {
+            domain: domain,
+            headers: headers,
+            cookies: cookies
+        };
+
+        $.ajax({
+            url: '/api/domain-configs',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data)
+        })
+        .done(function(response) {
+            if (response.success) {
+                showAlert(response.message);
+                clearForm();
+                loadConfigs();
+            } else {
+                showAlert('保存失败: ' + response.error, 'error');
+            }
+        })
+        .fail(function() {
+            showAlert('保存失败: 网络错误', 'error');
+        });
+    }
+
+    function editConfig(domain) {
+        $.get('/api/domain-configs')
+            .done(function(response) {
+                if (response.success && response.data[domain]) {
+                    const config = response.data[domain];
+                    $('#domain').val(domain);
+                    $('#headers').val(JSON.stringify(config.headers || {}, null, 2));
+                    $('#cookies').val(JSON.stringify(config.cookies || {}, null, 2));
+
+                    // 滚动到表单
+                    $('html, body').animate({
+                        scrollTop: $('#configForm').offset().top - 20
+                    }, 500);
+                }
+            });
+    }
+
+    function deleteConfig(domain) {
+        if (!confirm(`确定要删除域名 "${domain}" 的配置吗？`)) {
+            return;
+        }
+
+        $.ajax({
+            url: `/api/domain-configs/${encodeURIComponent(domain)}`,
+            method: 'DELETE'
+        })
+        .done(function(response) {
+            if (response.success) {
+                showAlert(response.message);
+                loadConfigs();
+            } else {
+                showAlert('删除失败: ' + response.error, 'error');
+            }
+        })
+        .fail(function() {
+            showAlert('删除失败: 网络错误', 'error');
+        });
+    }
+</script>
+{% endblock %}

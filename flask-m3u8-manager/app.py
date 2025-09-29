@@ -53,6 +53,10 @@ settings_lock = threading.Lock()
 # 运行时设置（从数据库加载，可通过API修改）
 runtime_settings = {}
 
+# 域名配置存储（内存存储）
+domain_configs = {}  # 格式: {domain: {headers: {}, cookies: {}}}
+domain_config_lock = threading.Lock()
+
 # 任务队列管理
 task_queue = []
 active_tasks = {}  # 存储活跃的任务线程和停止事件
@@ -196,6 +200,77 @@ def save_runtime_setting(key, value, value_type='str', description=''):
         print(f"❌ 保存配置失败 {key}: {e}")
         return False
 
+def get_domain_from_url(url):
+    """从URL中提取域名"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return parsed.netloc.lower()
+    except Exception:
+        return None
+
+def get_domain_config(domain):
+    """获取指定域名的配置"""
+    with domain_config_lock:
+        return domain_configs.get(domain, {})
+
+def set_domain_config(domain, headers=None, cookies=None):
+    """设置指定域名的配置"""
+    with domain_config_lock:
+        if domain not in domain_configs:
+            domain_configs[domain] = {}
+
+        if headers is not None:
+            domain_configs[domain]['headers'] = headers
+        if cookies is not None:
+            domain_configs[domain]['cookies'] = cookies
+
+        print(f"✅ 已设置域名 {domain} 的配置: headers={headers}, cookies={cookies}")
+
+def remove_domain_config(domain):
+    """删除指定域名的配置"""
+    with domain_config_lock:
+        if domain in domain_configs:
+            del domain_configs[domain]
+            print(f"✅ 已删除域名 {domain} 的配置")
+            return True
+        return False
+
+def get_all_domain_configs():
+    """获取所有域名配置"""
+    with domain_config_lock:
+        return dict(domain_configs)
+
+def merge_headers_with_domain_config(url, base_headers=None):
+    """根据URL的域名合并headers配置"""
+    domain = get_domain_from_url(url)
+    if not domain:
+        return base_headers or {}
+
+    # 获取域名配置
+    domain_config = get_domain_config(domain)
+
+    # 合并headers
+    merged_headers = base_headers.copy() if base_headers else {}
+    if 'headers' in domain_config:
+        merged_headers.update(domain_config['headers'])
+
+    # 处理cookies
+    if 'cookies' in domain_config and domain_config['cookies']:
+        # 将cookies字典转换为Cookie字符串
+        cookie_parts = []
+        for key, value in domain_config['cookies'].items():
+            cookie_parts.append(f"{key}={value}")
+        if cookie_parts:
+            cookie_string = '; '.join(cookie_parts)
+            # 如果已有Cookie header，则合并
+            if 'Cookie' in merged_headers:
+                merged_headers['Cookie'] = f"{merged_headers['Cookie']}; {cookie_string}"
+            else:
+                merged_headers['Cookie'] = cookie_string
+
+    return merged_headers
+
 def download_segment(url, filepath, headers=None, timeout=None):
     """下载单个切片"""
     try:
@@ -270,7 +345,7 @@ def download_m3u8_task(task_thread):
                 except json.JSONDecodeError:
                     print(f"自定义headers格式错误: {record.request_headers}")
             
-            processor = M3U8Processor(record.url, headers, record.source_url)
+            processor = M3U8Processor(record.url, headers, record.source_url, merge_headers_with_domain_config)
 
             # 解析M3U8
             if not processor.parse_m3u8():
@@ -1411,6 +1486,103 @@ def get_database_status():
     except Exception as e:
         return jsonify({
             'error': f'获取数据库状态失败: {str(e)}'
+        }), 500
+
+
+# ==================== 域名配置管理路由 ====================
+
+@app.route('/domain-config')
+def domain_config_page():
+    """域名配置管理页面"""
+    return render_template('domain_config.html')
+
+@app.route('/api/domain-configs', methods=['GET'])
+def get_domain_configs():
+    """获取所有域名配置"""
+    try:
+        configs = get_all_domain_configs()
+        return jsonify({
+            'success': True,
+            'data': configs
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取域名配置失败: {str(e)}'
+        }), 500
+
+@app.route('/api/domain-configs', methods=['POST'])
+def save_domain_config():
+    """保存域名配置"""
+    try:
+        data = request.get_json()
+
+        if not data or 'domain' not in data:
+            return jsonify({
+                'success': False,
+                'error': '缺少域名参数'
+            }), 400
+
+        domain = data['domain'].strip().lower()
+        if not domain:
+            return jsonify({
+                'success': False,
+                'error': '域名不能为空'
+            }), 400
+
+        headers = data.get('headers', {})
+        cookies = data.get('cookies', {})
+
+        # 验证headers格式
+        if headers and not isinstance(headers, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Headers必须是对象格式'
+            }), 400
+
+        # 验证cookies格式
+        if cookies and not isinstance(cookies, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Cookies必须是对象格式'
+            }), 400
+
+        # 保存配置
+        set_domain_config(domain, headers, cookies)
+
+        return jsonify({
+            'success': True,
+            'message': f'域名 {domain} 配置保存成功'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'保存域名配置失败: {str(e)}'
+        }), 500
+
+@app.route('/api/domain-configs/<domain>', methods=['DELETE'])
+def delete_domain_config(domain):
+    """删除域名配置"""
+    try:
+        domain = domain.strip().lower()
+        success = remove_domain_config(domain)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'域名 {domain} 配置删除成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'域名 {domain} 配置不存在'
+            }), 404
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'删除域名配置失败: {str(e)}'
         }), 500
 
 

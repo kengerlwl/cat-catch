@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}M3U8 下载管理器{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}bg-light{% endblock %}">
+    <!-- 统一导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-cloud-download me-2"></i>
+                <strong>M3U8 下载管理器</strong>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="/">
+                            <i class="bi bi-house-fill me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'domain_config' %}active{% endif %}" href="/domain-config">
+                            <i class="bi bi-globe me-1"></i>域名配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'prompts' %}active{% endif %}" href="/prompts">
+                            <i class="bi bi-chat-text me-1"></i>Prompt管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'llm_config' %}active{% endif %}" href="/llm-config">
+                            <i class="bi bi-gear me-1"></i>LLM配置
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="showSettings()">
+                                <i class="bi bi-sliders me-2"></i>系统设置
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="showQueueStatus()">
+                                <i class="bi bi-bar-chart me-2"></i>队列状态
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="showHelp()">
+                                <i class="bi bi-question-circle me-2"></i>使用帮助
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <main class="container mt-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="mt-5 py-4 bg-white border-top">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-cloud-download me-2"></i>
+                        M3U8 下载管理器 - 高效的视频下载解决方案
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted mb-0">
+                        <small>支持批量下载、智能转换、AI命名</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 全局JavaScript -->
+    <script>
+        // 全局设置函数
+        function showSettings() {
+            // 如果在首页，显示设置面板
+            if (window.location.pathname === '/') {
+                if (typeof toggleSettings === 'function') {
+                    toggleSettings();
+                }
+            } else {
+                // 其他页面跳转到首页并显示设置
+                window.location.href = '/?show=settings';
+            }
+        }
+
+        function showQueueStatus() {
+            if (window.location.pathname === '/') {
+                if (typeof showQueueStatusModal === 'function') {
+                    showQueueStatusModal();
+                }
+            } else {
+                window.location.href = '/?show=queue';
+            }
+        }
+
+        function showHelp() {
+            alert('使用帮助：\n\n1. 在首页添加M3U8链接进行下载\n2. 在域名配置中设置专用Headers和Cookies\n3. 在Prompt管理中配置AI提示词\n4. 在LLM配置中设置大模型参数\n\n更多功能正在开发中...');
+        }
+
+        // 页面加载完成后的初始化
+        $(document).ready(function() {
+            // 检查URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const show = urlParams.get('show');
+
+            if (show === 'settings' && typeof toggleSettings === 'function') {
+                setTimeout(toggleSettings, 500);
+            } else if (show === 'queue' && typeof showQueueStatusModal === 'function') {
+                setTimeout(showQueueStatusModal, 500);
+            }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

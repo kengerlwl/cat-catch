@@ -33,8 +33,10 @@ except ImportError:
         unpad = None
 
 class M3U8Processor:
-    def __init__(self, m3u8_url, headers=None, source_url=None):
+    def __init__(self, m3u8_url, headers=None, source_url=None, domain_config_merger=None):
         self.m3u8_url = m3u8_url
+        self.domain_config_merger = domain_config_merger  # 域名配置合并函数
+
         # 默认header配置，模拟浏览器行为
         default_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -70,7 +72,17 @@ class M3U8Processor:
         # 如果提供了自定义headers，则合并到默认headers中
         if headers:
             default_headers.update(headers)
-        print(f"最终headers: {default_headers}")
+
+        # 使用域名配置合并器合并域名特定的配置
+        if self.domain_config_merger:
+            try:
+                default_headers = self.domain_config_merger(self.m3u8_url, default_headers)
+                print(f"已应用域名配置，最终headers: {default_headers}")
+            except Exception as e:
+                print(f"应用域名配置失败: {e}")
+        else:
+            print(f"最终headers: {default_headers}")
+
         self.headers = default_headers
         self.m3u8_obj = None
         self.segments = []
@@ -81,7 +93,18 @@ class M3U8Processor:
         """解析 M3U8 文件"""
         try:
             print(f"正在解析 M3U8: {self.m3u8_url}")
-            self.m3u8_obj = m3u8.load(self.m3u8_url, headers=self.headers)
+
+            # 为M3U8 URL应用域名配置
+            headers_to_use = self.headers
+            if self.domain_config_merger:
+                try:
+                    headers_to_use = self.domain_config_merger(self.m3u8_url, self.headers)
+                    print(f"为M3U8解析应用域名配置")
+                except Exception as e:
+                    print(f"为M3U8 URL应用域名配置失败: {e}")
+                    headers_to_use = self.headers
+
+            self.m3u8_obj = m3u8.load(self.m3u8_url, headers=headers_to_use)
 
             if not self.m3u8_obj.segments:
                 raise ValueError("M3U8 文件中没有找到视频片段")
@@ -129,7 +152,17 @@ class M3U8Processor:
 
         try:
             print(f"下载密钥: {key_uri}")
-            response = requests.get(key_uri, headers=self.headers, timeout=30)
+
+            # 为密钥URL应用域名配置
+            headers_to_use = self.headers
+            if self.domain_config_merger:
+                try:
+                    headers_to_use = self.domain_config_merger(key_uri, self.headers)
+                except Exception as e:
+                    print(f"为密钥URL应用域名配置失败: {e}")
+                    headers_to_use = self.headers
+
+            response = requests.get(key_uri, headers=headers_to_use, timeout=30)
             response.raise_for_status()
 
             key_data = response.content
@@ -195,7 +228,16 @@ class M3U8Processor:
         try:
             print(f"下载切片 {segment_info['index']}: {segment_info['url']}")
 
-            response = requests.get(segment_info['url'], headers=self.headers, timeout=30)
+            # 为每个切片URL应用域名配置
+            headers_to_use = self.headers
+            if self.domain_config_merger:
+                try:
+                    headers_to_use = self.domain_config_merger(segment_info['url'], self.headers)
+                except Exception as e:
+                    print(f"为切片URL应用域名配置失败: {e}")
+                    headers_to_use = self.headers
+
+            response = requests.get(segment_info['url'], headers=headers_to_use, timeout=30)
             response.raise_for_status()
 
             data = response.content
