@@ -5,43 +5,43 @@ import subprocess
 
 block_cipher = None
 
-# 获取当前目录
+# Get current directory
 current_dir = os.path.dirname(os.path.abspath(SPEC))
 
-# 检查并解压 FFmpeg 文件（仅在打包时）
+# Check and extract FFmpeg files (only during packaging)
 def ensure_ffmpeg_binaries():
-    """确保 FFmpeg 二进制文件可用于打包"""
+    """Ensure FFmpeg binaries are available for packaging"""
     bin_dir = os.path.join(current_dir, 'bin')
     bin_7z = os.path.join(current_dir, 'bin.7z')
     ffmpeg_exe = os.path.join(bin_dir, 'ffmpeg.exe')
 
-    # 如果 bin 目录不存在或 ffmpeg.exe 不存在，则解压
+    # If bin directory or ffmpeg.exe doesn't exist, extract from bin.7z
     if not os.path.exists(ffmpeg_exe):
         if os.path.exists(bin_7z):
-            print("正在为打包解压 FFmpeg 文件...")
+            print("Extracting FFmpeg files for packaging...")
             try:
-                # 尝试使用 7z 命令解压
+                # Try to use 7z command to extract
                 result = subprocess.run(['7z', 'x', bin_7z, f'-o{bin_dir}'],
                                       capture_output=True, text=True)
                 if result.returncode == 0:
-                    print("FFmpeg 文件解压成功")
+                    print("FFmpeg files extracted successfully")
                 else:
-                    print(f"警告: 7z 解压失败: {result.stderr}")
-                    print("请手动解压 bin.7z 到 bin/ 目录")
+                    print(f"Warning: 7z extraction failed: {result.stderr}")
+                    print("Please manually extract bin.7z to bin/ directory")
             except FileNotFoundError:
-                print("警告: 未找到 7z 命令")
-                print("请安装 p7zip 或手动解压 bin.7z 到 bin/ 目录")
+                print("Warning: 7z command not found")
+                print("Please install p7zip or manually extract bin.7z to bin/ directory")
         else:
-            print("警告: bin.7z 文件不存在，FFmpeg 将不会被包含在打包中")
+            print("Warning: bin.7z file not found, FFmpeg will not be included in the build")
     else:
-        print("FFmpeg 文件已准备就绪")
+        print("FFmpeg files are ready")
 
-# 执行 FFmpeg 检查
+# Execute FFmpeg check
 ensure_ffmpeg_binaries()
 
-# 动态构建 binaries 列表
+# Dynamically build binaries list
 def get_ffmpeg_binaries():
-    """获取可用的 FFmpeg 二进制文件列表"""
+    """Get available FFmpeg binary files list"""
     binaries = []
     ffmpeg_files = [
         'ffmpeg.exe', 'ffplay.exe', 'ffprobe.exe',
@@ -54,7 +54,7 @@ def get_ffmpeg_binaries():
         if os.path.exists(filepath):
             binaries.append((filepath, 'bin'))
         else:
-            print(f"警告: {filename} 不存在，将不会被包含在打包中")
+            print(f"Warning: {filename} not found, will not be included in the build")
 
     return binaries
 
@@ -135,8 +135,8 @@ a = Analysis(
         'cv2',
         'torch',
         'tensorflow',
-        'downloads.db',  # 排除本地数据库文件
-        '*.db',          # 排除所有数据库文件
+        'downloads.db',  # Exclude local database files
+        '*.db',          # Exclude all database files
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
